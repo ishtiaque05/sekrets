@@ -2,7 +2,6 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum FileError {
-    // ... (existing error variants)
     #[error("Hashing failed: {0}")]
     HashingError(String),
     #[error("Invalid hash output: {0}")]

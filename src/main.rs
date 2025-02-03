@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::{Arg, ArgAction, Command};
 use parser::Credential;
-use rpassword::read_password; // Import Result from anyhow for error handling
+use rpassword::read_password; 
 
 mod decryptor;
 mod encryptor;
@@ -33,7 +33,7 @@ fn main() -> Result<()> {
                 .help("The keyword for which to retrieve the password, e.g., --github")
                 .long_help("Specific keyword like --github to fetch the password for GitHub")
                 .action(ArgAction::Append),
-        ) // Changed to Append to allow multiple values
+        )
         .get_matches();
 
     if let Some(file) = matches.get_one::<String>("encrypt") {

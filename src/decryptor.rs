@@ -11,11 +11,9 @@ use std::io::{BufReader, Read};
 use std::{fs::File, io::BufRead};
 
 pub fn decrypt_file(filename: &str, password: &str) -> Result<String, FileError> {
-    // Open the encrypted file
     let file = File::open(filename).map_err(|err| FileError::FileReadError(err.to_string()))?;
     let mut reader = BufReader::new(file);
 
-    // Read the base64-encoded salt from the beginning of the file
     let mut salt_base64 = String::new();
     reader
         .read_line(&mut salt_base64)
@@ -25,7 +23,6 @@ pub fn decrypt_file(filename: &str, password: &str) -> Result<String, FileError>
     let salt = SaltString::from_b64(&salt_base64)
         .map_err(|_| FileError::InvalidHashOutput("Invalid salt encoding".to_string()))?;
 
-    // Derive the key from the password and salt
     let argon2 = Argon2::default();
     let password_hash = argon2
         .hash_password(password.as_bytes(), &salt)
@@ -43,13 +40,11 @@ pub fn decrypt_file(filename: &str, password: &str) -> Result<String, FileError>
         .map_err(|_| FileError::InvalidNonceSize("Invalid nonce size".to_string()))?;
     let nonce = Nonce::from_slice(&nonce_bytes);
 
-    // Read the remaining encrypted data
     let mut encrypted_data = Vec::new();
     reader
         .read_to_end(&mut encrypted_data)
         .map_err(|err| FileError::FileReadError(err.to_string()))?;
 
-    // Separate the ciphertext and the authentication tag
     let encrypted_data_len = encrypted_data.len();
     if encrypted_data_len < 16 {
         return Err(FileError::EncryptionError(
@@ -63,7 +58,6 @@ pub fn decrypt_file(filename: &str, password: &str) -> Result<String, FileError>
 
     let ciphertext = &mut encrypted_data[..tag_start];
 
-    // Decrypt the data
     key.decrypt_in_place_detached(nonce, b"", ciphertext, &tag_bytes.into())
         .map_err(|err| FileError::EncryptionError(err.to_string()))?;
 
