@@ -1,6 +1,7 @@
 use anyhow::Result;
 use clap::{Arg, ArgAction, Command};
-use parser::Credential; // Import Result from anyhow for error handling
+use parser::Credential;
+use rpassword::read_password; // Import Result from anyhow for error handling
 
 mod decryptor;
 mod encryptor;
@@ -37,12 +38,16 @@ fn main() -> Result<()> {
 
     if let Some(file) = matches.get_one::<String>("encrypt") {
         println!("File to encrypt: {}", file);
-        let res = encryptor::encrypt_file(file, "foo").unwrap();
+
+        println!("Enter password: ");
+        let password = read_password().expect("Failed to read password");
+        
+        let res = encryptor::encrypt_file(file, password.as_ref()).unwrap();
 
         println!("encrypted file is {:?}", res.clone());
         println!(
             "Decrypt file {:?}",
-            decryptor::decrypt_file(res.as_str(), "foo")
+            decryptor::decrypt_file(res.as_str(), password.as_ref())
         );
     }
 
@@ -52,7 +57,10 @@ fn main() -> Result<()> {
         if let Some(keywords) = matches.get_many::<String>("keyword") {
             for keyword in keywords {
                 println!("Keyword is {}", keyword);
-                let data = decryptor::decrypt_file(crendential_file.as_str(), "foo")?;
+
+                println!("Enter password: ");
+                let password = read_password().expect("Failed to read password");
+                let data = decryptor::decrypt_file(crendential_file.as_str(), password.as_ref())?;
 
                 let result = Credential::new(keyword.to_string()).get_credentials(data)?;
                 println!("Account: {} - Username: {}, Password: {}", keyword, result.username, result.password);
