@@ -15,6 +15,20 @@ fn test_cli_encrypt_parsing() {
 }
 
 #[googletest::test]
+fn test_missing_file_encrypt() {
+    let cli = build_cli();
+
+    let result = cli.try_get_matches_from(vec!["sekrets", "encrypt"]);
+
+    expect_pred!(result.is_err());
+    expect_that!(
+        result.unwrap_err().to_string(), 
+        contains_substring("the following required arguments were not provided:\n  --file <FILE>")
+    );
+
+}
+
+#[googletest::test]
 fn test_cli_decrypt_parsing() {
     let cli = build_cli();
     let matches = cli.get_matches_from(vec![
@@ -44,3 +58,14 @@ fn test_cli_decrypt_parsing() {
     expect_that!(accounts[1], eq("bank"));
 }
 
+#[googletest::test]
+fn test_decrypt_missing_args() {
+    let cli = build_cli();
+    let result = cli.try_get_matches_from(vec!["sekrets", "decrypt", "-f", "test.txt"]);
+
+    expect_pred!(result.is_err());
+    expect_that!(
+        result.unwrap_err().to_string(), 
+        contains_substring("the following required arguments were not provided:\n  --accounts")
+    );
+}
