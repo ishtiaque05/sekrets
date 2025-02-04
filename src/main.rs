@@ -1,57 +1,16 @@
-use anyhow::Result;
-use clap::{Arg, ArgAction, Command};
-use parser::Credential;
-use rpassword::read_password; 
-
 mod decryptor;
 mod encryptor;
 mod types;
 mod parser;
+mod cli;
+
+use anyhow::Result;
+use cli::build_cli;
+use parser::Credential;
+use rpassword::read_password; 
 
 fn main() -> Result<()> {
-    let matches = Command::new("sekret")
-    .version("1.0")
-    .author("Syed Ishtiaque Ahmad")
-    .about("Sssshhh it's a secret!!")
-    .subcommand_required(true)
-    .arg_required_else_help(true)
-    
-    .subcommand(
-        Command::new("encrypt")
-            .about("Encrypt a file")
-            .arg(
-                Arg::new("file")
-                    .short('f')
-                    .long("file")
-                    .value_name("FILE")
-                    .help("File to encrypt")
-                    .required(true)
-                    .action(ArgAction::Set),
-            ),
-    )
-    .subcommand(
-        Command::new("decrypt")
-            .about("Decrypt a file and retrieve account credentials")
-            .arg(
-                Arg::new("file")
-                    .short('f')
-                    .long("file")
-                    .value_name("FILE")
-                    .help("File to decrypt")
-                    .required(true)
-                    .action(ArgAction::Set),
-            )
-            .arg(
-                Arg::new("accounts")
-                    .short('a')
-                    .long("accounts")
-                    .value_name("ACCOUNT")
-                    .help("Account(s) for which to retrieve credentials (e.g., github bank)")
-                    .required(true)
-                    .action(ArgAction::Append),
-            ),
-    )
-    .get_matches();
+    let matches = build_cli().get_matches();
 
     match matches.subcommand() {
         Some(("encrypt", sub_matches)) => {
