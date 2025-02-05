@@ -7,7 +7,6 @@ mod cli;
 use anyhow::Result;
 use cli::build_cli;
 use parser::Credential;
-use rpassword::read_password; 
 
 fn main() -> Result<()> {
     let matches = build_cli().get_matches();
@@ -18,8 +17,8 @@ fn main() -> Result<()> {
                 .get_one::<String>("file")
                 .expect("File is required");
             println!("Encrypting file: {}", file);
-            println!("Enter password: ");
-            let password = read_password().expect("Failed to read password");
+
+            let password = prompt_user_password();
             let encrypted_file = encryptor::encrypt_file(file, password.as_str())?;
             println!("Encrypted file created: {}", encrypted_file);
         }
@@ -33,8 +32,7 @@ fn main() -> Result<()> {
                 .collect();
 
             println!("Decrypting file: {}", file);
-            println!("Enter password: ");
-            let password = read_password().expect("Failed to read password");
+            let password = prompt_user_password();
             let decrypted_data = decryptor::decrypt_file(file, password.as_str())?;
             for account in accounts {
                 let result = Credential::new(account.to_string()).get_credentials(decrypted_data.clone())?;
@@ -48,4 +46,13 @@ fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+pub fn prompt_user_password() -> String {
+    if std::env::var("TEST_MODE").is_ok() {
+        return "foo".to_string();
+    }
+    use rpassword::read_password;
+    println!("Enter password: ");
+    read_password().expect("Failed to read password")
 }
