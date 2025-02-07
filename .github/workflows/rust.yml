@@ -27,8 +27,11 @@ jobs:
       run: cargo install cargo-tarpaulin --locked
 
     - name: Run Test Coverage
-      run: cargo tarpaulin --out xml --output-file coverage.xml
-      
+      run: cargo tarpaulin --out xml
+    
+    - name: Rename Coverage Report
+      run: mv cobertura.xml coverage.xml 
+
     - name: Upload Coverage to Codecov
       uses: codecov/codecov-action@v3
       with:
