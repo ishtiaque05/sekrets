@@ -20,3 +20,13 @@ jobs:
       run: cargo build --verbose
     - name: Run tests
       run: cargo test --verbose
+    - name: Install `cargo-tarpaulin`
+      run: cargo install cargo-tarpaulin --locked
+    - name: Run Test Coverage
+      run: cargo tarpaulin --out xml --output-file coverage.xml
+    - name: Upload Coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}  
+        files: coverage.xml
+        fail_ci_if_error: true
