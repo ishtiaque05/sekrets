@@ -65,3 +65,6 @@ pub fn encrypt_file(filename: &str, password: &str) -> Result<String, FileError>
 
     Ok(encrypted_filename)
 }
+
+#[cfg(test)]
+mod tests;

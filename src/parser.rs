@@ -11,7 +11,7 @@ pub struct Credential {
     pub account: String
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct ParseResult {
     pub username: String,
     pub password: String
@@ -58,3 +58,5 @@ impl Credential {
     }
 }
 
+#[cfg(test)]
+mod tests;

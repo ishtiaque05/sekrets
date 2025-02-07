@@ -1,2 +1,0 @@
-Bank - username: foo, password: bar
-github - username: bar, password: git

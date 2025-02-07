@@ -1,33 +1,32 @@
-// src/tests/encrypt_file_tests.rs
+use super::*; 
+use googletest::prelude::*;
+use std::fs::File;
+use std::io::Write;
+use tempfile::TempDir;
 
-use super::*;
-use std::fs; // Added for file manipulation
-
-#[test]
+#[googletest::test]
 fn test_encrypt_file_success() {
-    // Setup
-    let temp_file_path = "test_file.txt";
-    fs::write(temp_file_path, "This is a test file").unwrap();
+    let temp_dir = TempDir::new().expect("Failed to create temporary directory");
 
-    let password = "super_secret_password";
+    let file_path = temp_dir.path().join("test_input.txt");
 
-    // Exercise
-    let result = encrypt_file(temp_file_path, password);
+    let mut file = File::create(&file_path).expect("Failed to create file");
+    writeln!(file, "github - username: foo, password: bar").expect("Failed to write to file");
 
-    // Verify
-    assert!(result.is_ok());
+    let file_path_str = file_path.to_str().expect("Failed to convert file path to string");
+
+    let result = encrypt_file(file_path_str, "foo");
+
+    expect_pred!(result.is_ok());
     let output = result.unwrap();
 
-    assert!(output.ends_with(".enc")); // Check encrypted file extension
-    
-    // Cleanup
-    fs::remove_file(temp_file_path).unwrap();
-    fs::remove_file(parts[0]).unwrap(); 
+    expect_pred!(output.ends_with(".enc"));
 }
 
+#[googletest::test]
+fn test_encrypt_file_nonexistent() {
+    let result = encrypt_file("non_existent_file.txt", "foo");
+    expect_pred!(result.is_err());
 
-// Add more tests to cover different scenarios:
-// - Incorrect password
-// - File doesn't exist
-// - Empty file
-// ...
+    expect_that!(result, err(matches_pattern!(FileError::FileReadError{ .. })));
+}

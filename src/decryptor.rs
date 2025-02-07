@@ -66,3 +66,6 @@ pub fn decrypt_file(filename: &str, password: &str) -> Result<String, FileError>
 
     Ok(decrypted_content)
 }
+
+#[cfg(test)]
+mod tests;

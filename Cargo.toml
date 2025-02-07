@@ -14,3 +14,9 @@ argon2 = "0.5"
 rand = "0.8.5"
 base64 = "0.13"
 rpassword = "7.0" 
+
+[dev-dependencies]
+googletest = "0.13"
+assert_cmd = "2.0"
+tempfile = "3.5"
+predicates = "2.1"
