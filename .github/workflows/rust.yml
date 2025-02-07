@@ -27,7 +27,7 @@ jobs:
       run: cargo install cargo-tarpaulin --locked
 
     - name: Run Test Coverage
-      run: cargo tarpaulin --out xml
+      run: cargo tarpaulin --tests --all-targets --out xml
     
     - name: Rename Coverage Report
       run: mv cobertura.xml coverage.xml 
