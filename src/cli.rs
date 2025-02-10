@@ -25,15 +25,6 @@ pub fn build_cli() -> Command {
         Command::new("decrypt")
             .about("Decrypt a file and retrieve account credentials")
             .arg(
-                Arg::new("file")
-                    .short('f')
-                    .long("file")
-                    .value_name("FILE")
-                    .help("File to decrypt")
-                    .required(true)
-                    .action(ArgAction::Set),
-            )
-            .arg(
                 Arg::new("accounts")
                     .short('a')
                     .long("accounts")

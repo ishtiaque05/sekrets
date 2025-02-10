@@ -1,4 +1,4 @@
-use crate::types::FileError;
+use crate::{paths::get_encrypted_file_path, types::FileError};
 use aes_gcm::{
     aead::{AeadInPlace, KeyInit},
     Aes256Gcm, Nonce,
@@ -10,6 +10,8 @@ use argon2::{
 use rand::rngs::OsRng;
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
+
+pub const ENCRYPTED_FILENAME: &str = "sekrets.enc";
 
 pub fn encrypt_file(filename: &str, password: &str) -> Result<String, FileError> {
     let salt = SaltString::generate(&mut OsRng);
@@ -47,7 +49,8 @@ pub fn encrypt_file(filename: &str, password: &str) -> Result<String, FileError>
     buffer.extend_from_slice(tag.as_slice());
 
     
-    let encrypted_filename = format!("{}.enc", filename);
+    let encrypted_filename = get_encrypted_file_path(ENCRYPTED_FILENAME).to_string_lossy().into_owned();
+
     let mut encrypted_file = OpenOptions::new()
         .write(true)
         .create(true)
