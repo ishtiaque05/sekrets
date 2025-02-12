@@ -34,8 +34,6 @@ fn test_cli_decrypt_parsing() {
     let matches = cli.get_matches_from(vec![
         "sekrets",
         "decrypt",
-        "-f",
-        "test.txt",
         "-a",
         "github",
         "-a",
@@ -44,9 +42,6 @@ fn test_cli_decrypt_parsing() {
 
     let (subcommand_name, sub_matches) = matches.subcommand().expect("Expected a subcommand");
     expect_that!(subcommand_name, eq("decrypt"));
-
-    let file = sub_matches.get_one::<String>("file").expect("File not found");
-    expect_that!(file, eq("test.txt"));
 
     let accounts: Vec<_> = sub_matches
         .get_many::<String>("accounts")
@@ -61,7 +56,7 @@ fn test_cli_decrypt_parsing() {
 #[googletest::test]
 fn test_decrypt_missing_args() {
     let cli = build_cli();
-    let result = cli.try_get_matches_from(vec!["sekrets", "decrypt", "-f", "test.txt"]);
+    let result = cli.try_get_matches_from(vec!["sekrets", "decrypt"]);
 
     expect_pred!(result.is_err());
     expect_that!(

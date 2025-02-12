@@ -14,6 +14,12 @@ pub enum FileError {
     FileReadError(String),
     #[error("Failed to read to file: {0}")]
     EncryptionError(String),
+    #[error("Failed to generate key: {0}")]
+    KeyGenerationError(String),
+    #[error("Invalid Ciphertext: {0}")]
+    InvalidCiphertext(String),
+    #[error("Decryption Error: {0}")]
+    DecryptionError(String),
 }
 
 #[cfg(test)]

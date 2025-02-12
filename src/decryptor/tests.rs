@@ -1,8 +1,8 @@
 use super::*;
 use crate::encryptor::encrypt_file;
 use crate::types::FileError;
-use tempfile::NamedTempFile;
-use std::fs::File;
+use tempfile::{NamedTempFile, TempDir};
+use std::fs::{self, File};
 use std::io::Write;
 use googletest::prelude::*;
 
@@ -20,13 +20,19 @@ fn create_temp_plaintext_file(content: &str) -> NamedTempFile {
 
 #[googletest::test]
 fn test_successful_encryption_and_decryption() {
+    
     let password = "secure_password";
     let original_content = "Hello Rust!";
-    
-    let temp_file = create_temp_plaintext_file(original_content);
 
-    let encrypted_filename = encrypt_file(temp_file.path().to_str().unwrap(), password)
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+
+    let temp_file_path = temp_dir.path().join("plaintext.txt");
+    fs::write(&temp_file_path, original_content).expect("Failed to write temp file");
+
+    let encrypted_filename = encrypt_file(temp_file_path.to_str().unwrap(), password)
         .expect("Encryption failed");
+
+    println!("Attempting to decrypt: {}", encrypted_filename);
 
     let decrypted_content = decrypt_file(&encrypted_filename, password)
         .expect("Decryption failed");
@@ -65,4 +71,5 @@ fn test_decryption_fails_with_invalid_salt() {
 
     expect_pred!(result.is_err());
     expect_that!(result, err(matches_pattern!(FileError::InvalidHashOutput(_))));
+
 }
