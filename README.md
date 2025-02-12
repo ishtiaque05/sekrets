@@ -18,3 +18,8 @@ tar -xzvf sekrets-linux.tar.gz
 cd sekrets-release
 sudo make install
 ```
+
+### Versioning
+
+We rely on https://semver.org/ for this project.
+
