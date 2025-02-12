@@ -1,6 +1,10 @@
+use std::env;
 use googletest::prelude::*;
+use tempfile::TempDir;
+use std::fs::File;
+use std::io::Write;
 
-use crate::cli::build_cli;
+use crate::{cli::{build_cli, prompt_user_password, run}, encryptor::encrypt_file};
 
 #[googletest::test]
 fn test_cli_encrypt_parsing() {
@@ -63,4 +67,61 @@ fn test_decrypt_missing_args() {
         result.unwrap_err().to_string(), 
         contains_substring("the following required arguments were not provided:\n  --accounts")
     );
+}
+
+#[googletest::test]
+fn test_run_encrypt_command() {
+    env::set_var("TEST_MODE", "1"); 
+    
+    let temp_dir = TempDir::new().expect("Failed to create temporary directory");
+
+    let file_path = temp_dir.path().join("test_input.txt");
+
+    let mut file = File::create(&file_path).expect("Failed to create file");
+    writeln!(file, "github - username: foo, password: bar").expect("Failed to write to file");
+
+    let file_path_str = file_path.to_str().expect("Failed to convert file path to string");
+    
+    let matches = build_cli()
+        .try_get_matches_from(vec!["sekrets", "encrypt", "--file", file_path_str])
+        .expect("Failed to parse arguments");
+
+    
+    let result = run(&matches);
+
+    expect_pred!(result.is_ok());
+    
+    
+}
+
+#[googletest::test]
+fn test_run_decrypt_command() {
+    env::set_var("TEST_MODE", "1"); 
+
+    let temp_dir = TempDir::new().expect("Failed to create temporary directory");
+
+    let file_path = temp_dir.path().join("test_input.txt");
+
+    let mut file = File::create(&file_path).expect("Failed to create file");
+    writeln!(file, "github - username: foo, password: bar").expect("Failed to write to file");
+
+    let file_path_str = file_path.to_str().expect("Failed to convert file path to string");
+
+    let pass = prompt_user_password();
+    let _ = encrypt_file(file_path_str, &pass).expect("not to fail");
+    
+    let matches = build_cli()
+        .try_get_matches_from(vec!["sekrets", "decrypt", "--accounts", "github"])
+        .expect("Failed to parse arguments");
+
+    let result = run(&matches);
+
+    expect_pred!(result.is_ok());
+}
+
+#[googletest::test]
+fn test_prompt_user_password_mocked() {
+    std::env::set_var("TEST_MODE", "1"); // Mock input
+    let password = prompt_user_password();
+    expect_that!(password, eq(&"foo".to_string()));
 }

@@ -30,3 +30,12 @@ fn test_encrypt_file_nonexistent() {
 
     expect_that!(result, err(matches_pattern!(FileError::FileReadError{ .. })));
 }
+
+#[googletest::test]
+fn test_read_file_contents_file_not_found() {
+    let result = read_file_contents("non_existent_file.txt");
+    
+    expect_pred!(result.is_err());
+
+    expect_that!(result, err(matches_pattern!(FileError::FileReadError { .. })));
+}

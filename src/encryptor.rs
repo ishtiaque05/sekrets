@@ -39,8 +39,10 @@ fn derive_encryption_key(password: &str) -> Result<(Aes256Gcm, SaltString, [u8; 
 fn read_file_contents(filename: &str) -> Result<Vec<u8>, FileError> {
     let mut file = File::open(filename).map_err(|err| FileError::FileReadError(err.to_string()))?;
     let mut buffer = Vec::new();
+
     file.read_to_end(&mut buffer)
         .map_err(|err| FileError::FileReadError(err.to_string()))?;
+    
     Ok(buffer)
 }
 
