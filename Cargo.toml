@@ -3,6 +3,15 @@ name = "sekrets"
 version = "0.1.0"
 edition = "2021"
 
+[package.metadata.deb]
+maintainer = "Syed Ishtiaque Ahmad <ishtiaque05@gmail.com>"
+depends = "libc6 (>= 2.28)"
+priority = "optional"
+section = "utils"
+assets = [
+    ["target/release/sekrets", "/usr/local/bin/", "755"]
+]
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
