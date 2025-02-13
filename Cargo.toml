@@ -2,6 +2,15 @@
 name = "sekrets"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+authors = ["Syed Ishtiaque Ahmad <ishtiaque05@gmail.com>"]
+description = "A secret management CLI tool"
+repository = "https://github.com/ishtiaque05/sekrets"
+homepage = "https://github.com/ishtiaque05/sekrets"
+readme = "README.md"
+categories = ["command-line-utilities"]
+keywords = ["cli", "security", "secrets"]
+
 
 [package.metadata.deb]
 maintainer = "Syed Ishtiaque Ahmad <ishtiaque05@gmail.com>"
