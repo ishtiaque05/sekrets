@@ -28,8 +28,11 @@ jobs:
       - name: Install cargo-deb
         run: cargo install cargo-deb
       
+      - name: Extract and Format Version
+        run: echo "VERSION=$(echo $GITHUB_REF_NAME | sed -E 's/^v//; s/rc/~rc/')" >> $GITHUB_ENV
+
       - name: Build Debian Package
-        run: cargo deb --deb-version ${{ github.ref_name }}
+        run: cargo deb --deb-version "$VERSION"
 
       - name: Build Release Binary
         run: cargo build --release
