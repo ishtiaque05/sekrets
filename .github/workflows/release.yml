@@ -47,6 +47,8 @@ jobs:
           mv sekrets-linux.tar.gz ../
 
       - name: Create GitHub Release
+        env:
+          LIB_VERSION: ${{ env.LIB_VERSION }}
         uses: softprops/action-gh-release@v2
         with:
           files: |
@@ -60,7 +62,7 @@ jobs:
             
             ### 📥 Manual Install:
             ```sh
-            wget https://github.com/ishtiaque05/sekrets/releases/download/${{ github.ref_name }}/sekrets_${LIB_VERSION}_amd64.deb
+            wget https://github.com/ishtiaque05/sekrets/releases/download/${{ github.ref_name }}/sekrets_$LIB_VERSION_amd64.deb
             sudo dpkg -i sekrets_${{ github.ref_name }}_amd64.deb
             ```
           
