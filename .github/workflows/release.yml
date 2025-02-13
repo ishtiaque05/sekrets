@@ -51,7 +51,7 @@ jobs:
             🚀 New release of Sekrets! Install using apt or manually:\n\n
             **Manual install:**\n
             \`\`\`
-            wget https://github.com/YOUR_USERNAME/YOUR_REPO/releases/download/${{ github.ref_name }}/sekrets_${{ github.ref_name }}_amd64.deb
+            wget https://github.com/ishtiaque05/sekrets/releases/download/${{ github.ref_name }}/sekrets_${{ github.ref_name }}_amd64.deb
             sudo dpkg -i sekrets_${{ github.ref_name }}_amd64.deb
              \`\`\`"
           
