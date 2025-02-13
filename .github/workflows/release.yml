@@ -5,6 +5,11 @@ on:
     tags:
       - "v*" # Runs when you push a tag like v1.0.0
 
+  workflow_run:
+    workflows: ["Rust"] 
+    types:
+      - completed
+
 permissions:
   contents: write
 
