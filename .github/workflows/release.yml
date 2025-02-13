@@ -29,7 +29,7 @@ jobs:
         run: cargo install cargo-deb
       
       - name: Build Debian Package
-        run: cargo deb
+        run: cargo deb --deb-version ${{ github.ref_name }}
 
       - name: Build Release Binary
         run: cargo build --release
