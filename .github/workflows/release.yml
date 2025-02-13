@@ -29,10 +29,10 @@ jobs:
         run: cargo install cargo-deb
       
       - name: Extract and Format Version
-        run: echo "VERSION=$(echo $GITHUB_REF_NAME | sed -E 's/^v//; s/rc/~rc/')" >> $GITHUB_ENV
+        run: echo "LIB_VERSION=$(echo $GITHUB_REF_NAME | sed -E 's/^v//; s/rc/~rc/')" >> $GITHUB_ENV
 
       - name: Build Debian Package
-        run: cargo deb --deb-version "$VERSION"
+        run: cargo deb --deb-version "$LIB_VERSION"
 
       - name: Build Release Binary
         run: cargo build --release
@@ -60,7 +60,7 @@ jobs:
             
             ### 📥 Manual Install:
             ```sh
-            wget https://github.com/ishtiaque05/sekrets/releases/download/${{ github.ref_name }}/sekrets_${{ github.ref_name }}_amd64.deb
+            wget https://github.com/ishtiaque05/sekrets/releases/download/${{ github.ref_name }}/sekrets_${LIB_VERSION}_amd64.deb
             sudo dpkg -i sekrets_${{ github.ref_name }}_amd64.deb
             ```
           
