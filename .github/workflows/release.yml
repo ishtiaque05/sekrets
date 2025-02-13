@@ -48,10 +48,11 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: "Sekrets ${{ github.ref_name }}"
           body: |
-            🚀 New release of Sekrets! Install using apt or manually:\n\n
-            **Manual install:**\n
-            \`\`\`
+            🚀 **New release of Sekrets!** Install using `apt` or manually:
+            
+            ### 📥 Manual Install:
+            ```sh
             wget https://github.com/ishtiaque05/sekrets/releases/download/${{ github.ref_name }}/sekrets_${{ github.ref_name }}_amd64.deb
             sudo dpkg -i sekrets_${{ github.ref_name }}_amd64.deb
-             \`\`\`"
+            ```
           
