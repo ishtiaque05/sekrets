@@ -64,8 +64,13 @@ clean:
 	rm -rf $(DATA_DIR) $(CONFIG_DIR) $(SNAP_DATA_DIR)
 	@echo "🧹 Cleaned up build and data directories"
 
-.PHONY: all build install uninstall clean
-
-
 gen-cov:
 	 cargo tarpaulin --tests --all-targets --out html --output-dir ./coverage
+
+
+install-deb:
+	cargo clean
+	cargo deb
+	sudo dpkg -i $(shell ls -t target/debian/sekrets_*.deb | head -n 1)
+
+.PHONY: all build install uninstall clean gen-cov install-deb
