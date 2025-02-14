@@ -17,6 +17,8 @@ jobs:
   build:
     name: Build & Release Sekrets
     runs-on: ubuntu-latest
+    # run this if Rust workflow pass and the event is push for tag
+    if: github.event_name == 'push' || github.event.workflow_run.conclusion == 'success'
 
     steps:
       - name: Checkout Repository
