@@ -21,11 +21,13 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      # cache step for Cargo dependencies, binaries, and build artifacts
+      # Cache step for Cargo dependencies, binaries, and build artifacts
       - name: Cache Cargo Dependencies, Binaries, and Build Artifacts
         uses: actions/cache@v3
         with:
@@ -44,8 +46,24 @@ jobs:
             cargo install cargo-deb
           fi
 
+      # Extract version without leading 'v'
       - name: Extract and Format Version
         run: echo "LIB_VERSION=$(echo $GITHUB_REF_NAME | sed -E 's/^v//')" >> $GITHUB_ENV
+
+      # Get the previous tag for comparison
+      - name: Find Previous Tag
+        id: prev_tag
+        run: echo "PREV_TAG=$(git describe --tags --abbrev=0 $(git rev-list --tags --skip=1 --max-count=1))" >> $GITHUB_ENV
+
+      # Generate the changelog (commit messages between tags)
+      - name: Generate Changelog
+        id: changelog
+        run: |
+          if [ -z "$PREV_TAG" ]; then
+            echo "CHANGELOG=$(git log --pretty=format:'- %s' $(git rev-list --max-parents=0 HEAD)..HEAD)" >> $GITHUB_ENV
+          else
+            echo "CHANGELOG=$(git log --pretty=format:'- %s' $PREV_TAG..HEAD)" >> $GITHUB_ENV
+          fi
 
       - name: Build Debian Package
         run: cargo deb --deb-version "$LIB_VERSION"
@@ -65,6 +83,8 @@ jobs:
       - name: Create GitHub Release
         env:
           LIB_VERSION: ${{ env.LIB_VERSION }}
+          PREV_TAG: ${{ env.PREV_TAG }}
+          CHANGELOG: ${{ env.CHANGELOG }}
         uses: softprops/action-gh-release@v2
         with:
           files: |
@@ -72,12 +92,19 @@ jobs:
             target/debian/*.deb
           token: ${{ secrets.GITHUB_TOKEN }}
           tag_name: ${{ github.ref_name }}
-          name: "Sekrets ${{ github.ref_name }}"
+          name: "Sekrets ${{ env.LIB_VERSION }}"
           body: |
-            🚀 **New release of Sekrets!** Install using `apt` or manually:
+            🚀 **New release of Sekrets ${{ env.LIB_VERSION }}**! 
+
+            ### 🔄 Changes:
+            ${{ env.CHANGELOG }}
+
+            ### 🔍 Compare Changes:
+            [View Diff](https://github.com/ishtiaque05/sekrets/compare/${{ env.PREV_TAG }}...${{ github.ref_name }})
             
             ### 📥 Manual Install:
             ```sh
             wget https://github.com/ishtiaque05/sekrets/releases/download/${{ github.ref_name }}/sekrets_${{ env.LIB_VERSION }}_amd64.deb
             sudo dpkg -i sekrets_${{ env.LIB_VERSION }}_amd64.deb
             ```
+
