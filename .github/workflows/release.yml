@@ -60,10 +60,13 @@ jobs:
         id: changelog
         run: |
           if [ -z "$PREV_TAG" ]; then
-            echo "CHANGELOG=$(git log --pretty=format:'- %s' $(git rev-list --max-parents=0 HEAD)..HEAD)" >> $GITHUB_ENV
+            CHANGELOG=$(git log --pretty=format:'- %s' $(git rev-list --max-parents=0 HEAD)..HEAD | sed ':a;N;$!ba;s/\n/\\n/g')
           else
-            echo "CHANGELOG=$(git log --pretty=format:'- %s' $PREV_TAG..HEAD)" >> $GITHUB_ENV
+            CHANGELOG=$(git log --pretty=format:'- %s' $PREV_TAG..HEAD | sed ':a;N;$!ba;s/\n/\\n/g')
           fi
+          echo "CHANGELOG<<EOF" >> $GITHUB_ENV
+          echo -e "$CHANGELOG" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
 
       - name: Build Debian Package
         run: cargo deb --deb-version "$LIB_VERSION"
