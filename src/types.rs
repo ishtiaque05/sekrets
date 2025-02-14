@@ -21,6 +21,3 @@ pub enum FileError {
     #[error("Decryption Error: {0}")]
     DecryptionError(String),
 }
-
-#[cfg(test)]
-mod tests;

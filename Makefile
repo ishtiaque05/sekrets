@@ -73,4 +73,13 @@ install-deb:
 	cargo deb
 	sudo dpkg -i $(shell ls -t target/debian/sekrets_*.deb | head -n 1)
 
-.PHONY: all build install uninstall clean gen-cov install-deb
+
+clippy:
+	cargo clippy --all --all-targets --all-features -- -D warnings
+
+fmt_check:
+	cargo fmt --all -- --check
+
+lint: clippy fmt_check
+
+.PHONY: all build install uninstall clean gen-cov install-deb clippy fmt_check

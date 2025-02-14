@@ -1,4 +1,4 @@
-use super::*; 
+use super::*;
 use googletest::prelude::*;
 use std::path::PathBuf;
 

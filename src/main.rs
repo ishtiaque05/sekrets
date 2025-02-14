@@ -1,14 +1,13 @@
+mod cli;
 mod decryptor;
 mod encryptor;
-mod types;
 mod parser;
-mod cli;
 mod paths;
+pub mod tests;
+mod types;
 
 use anyhow::Result;
 use cli::{build_cli, run};
-
-
 
 fn main() -> Result<()> {
     paths::ensure_dirs();

@@ -7,7 +7,6 @@ use std::path::PathBuf;
 #[cfg(test)]
 use tempfile::TempDir;
 
-
 #[cfg(test)]
 thread_local! {
     static TEST_TEMP_DIR: RefCell<TempDir> = RefCell::new(TempDir::new()
@@ -16,11 +15,15 @@ thread_local! {
 // static TEST_TEMP_DIR: OnceLock<TempDir> = OnceLock::new();
 
 pub fn get_config_path() -> PathBuf {
-    config_dir().unwrap_or_else(|| PathBuf::from("~/.config")).join("sekrets")
+    config_dir()
+        .unwrap_or_else(|| PathBuf::from("~/.config"))
+        .join("sekrets")
 }
 
 pub fn get_data_path() -> PathBuf {
-    data_dir().unwrap_or_else(|| PathBuf::from("~/.local/share")).join("sekrets")
+    data_dir()
+        .unwrap_or_else(|| PathBuf::from("~/.local/share"))
+        .join("sekrets")
 }
 
 #[cfg(not(test))]
@@ -34,9 +37,7 @@ pub fn get_encrypted_file_path(file_name: &str) -> PathBuf {
 
         return temp_dir.join(file_name);
     }
-
     let mut path = get_data_path();
-    
     path.push("encrypted");
     fs::create_dir_all(&path).expect("Failed to create encrypted files directory");
     path.push(file_name);
@@ -47,7 +48,6 @@ pub fn get_encrypted_file_path(file_name: &str) -> PathBuf {
 fn get_test_temp_dir() -> PathBuf {
     TEST_TEMP_DIR.with(|temp_dir| temp_dir.borrow().path().to_path_buf())
 }
-
 
 #[cfg(test)]
 pub fn get_encrypted_file_path(file_name: &str) -> PathBuf {
