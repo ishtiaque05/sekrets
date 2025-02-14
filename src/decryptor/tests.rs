@@ -1,48 +1,27 @@
 use super::*;
 use crate::encryptor::encrypt_file;
 use crate::types::FileError;
-use tempfile::{NamedTempFile, TempDir};
-use std::fs::{self, File};
-use std::io::Write;
 use googletest::prelude::*;
 
-fn create_temp_plaintext_file(content: &str) -> NamedTempFile {
-    let temp_file = NamedTempFile::new().expect("Failed to create temp file");
-    let mut file = File::create(temp_file.path()).expect("Failed to open temp file");
-
-    file.write_all(content.as_bytes())
-        .expect("Failed to write to temp file");
-
-    file.flush().expect("Failed to flush file");
-
-    temp_file
-}
+use crate::tests::helpers::create_temp_plaintext_file;
 
 #[googletest::test]
 fn test_successful_encryption_and_decryption() {
-    
     let password = "secure_password";
-    let original_content = "Hello Rust!";
+    let temp_file = create_temp_plaintext_file("Hello Rust!");
 
-    let temp_dir = TempDir::new().expect("Failed to create temp dir");
-
-    let temp_file_path = temp_dir.path().join("plaintext.txt");
-    fs::write(&temp_file_path, original_content).expect("Failed to write temp file");
-
-    let encrypted_filename = encrypt_file(temp_file_path.to_str().unwrap(), password)
-        .expect("Encryption failed");
+    let encrypted_filename =
+        encrypt_file(temp_file.path().to_str().unwrap(), password).expect("Encryption failed");
 
     println!("Attempting to decrypt: {}", encrypted_filename);
 
-    let decrypted_content = decrypt_file(&encrypted_filename, password)
-        .expect("Decryption failed");
+    let decrypted_content = decrypt_file(&encrypted_filename, password).expect("Decryption failed");
 
-    expect_that!(decrypted_content, eq(original_content));
+    expect_that!(decrypted_content, eq("Hello Rust!"));
 }
 
 #[googletest::test]
 fn test_decryption_with_wrong_password_fails() {
-
     let temp_file = create_temp_plaintext_file("Sensitive Data");
     let encrypted_filename = encrypt_file(temp_file.path().to_str().unwrap(), "correct_password")
         .expect("Encryption failed");
@@ -63,13 +42,14 @@ fn test_decryption_of_nonexistent_file_fails() {
 #[googletest::test]
 fn test_decryption_fails_with_invalid_salt() {
     let password = "secure_pass";
-    let mut temp_file = NamedTempFile::new().expect("Failed to create temp file");
 
-    writeln!(temp_file, "%%%%%%%INVALID_SALT%%%%%%%").expect("Failed to write invalid salt");
+    let temp_file = create_temp_plaintext_file("%%%%%%%INVALID_SALT%%%%%%%");
 
     let result = decrypt_file(temp_file.path().to_str().unwrap(), password);
 
     expect_pred!(result.is_err());
-    expect_that!(result, err(matches_pattern!(FileError::InvalidHashOutput(_))));
-
+    expect_that!(
+        result,
+        err(matches_pattern!(FileError::InvalidHashOutput(_)))
+    );
 }

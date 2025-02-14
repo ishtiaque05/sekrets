@@ -16,11 +16,11 @@ pub const ENCRYPTED_FILENAME: &str = "sekrets.enc";
 fn derive_encryption_key(password: &str) -> Result<(Aes256Gcm, SaltString, [u8; 12]), FileError> {
     let salt = SaltString::generate(&mut OsRng);
     let argon2 = Argon2::default();
-    
+
     let password_hash = argon2
         .hash_password(password.as_bytes(), &salt)
         .map_err(|err| FileError::HashingError(err.to_string()))?;
-    
+
     let hash_output = password_hash
         .hash
         .ok_or_else(|| FileError::InvalidHashOutput("Hash output is empty".to_string()))?;
@@ -39,14 +39,20 @@ fn derive_encryption_key(password: &str) -> Result<(Aes256Gcm, SaltString, [u8; 
 fn read_file_contents(filename: &str) -> Result<Vec<u8>, FileError> {
     let mut file = File::open(filename).map_err(|err| FileError::FileReadError(err.to_string()))?;
     let mut buffer = Vec::new();
+
     file.read_to_end(&mut buffer)
         .map_err(|err| FileError::FileReadError(err.to_string()))?;
+
     Ok(buffer)
 }
 
-fn encrypt_data(key: &Aes256Gcm, nonce: &[u8; 12], data: &mut Vec<u8>) -> Result<Vec<u8>, FileError> {
+fn encrypt_data(
+    key: &Aes256Gcm,
+    nonce: &[u8; 12],
+    data: &mut Vec<u8>,
+) -> Result<Vec<u8>, FileError> {
     let nonce = Nonce::from_slice(nonce);
-    
+
     let tag = key
         .encrypt_in_place_detached(nonce, b"", data)
         .map_err(|err| FileError::EncryptionError(err.to_string()))?;
@@ -59,6 +65,7 @@ fn write_encrypted_file(filepath: &str, salt: &SaltString, data: &[u8]) -> Resul
     let mut file = OpenOptions::new()
         .write(true)
         .create(true)
+        .truncate(true)
         .open(filepath)
         .map_err(|err| FileError::FileWriteError(err.to_string()))?;
 

@@ -29,7 +29,10 @@ fn read_encrypted_file(filename: &str) -> Result<(SaltString, Vec<u8>), FileErro
     Ok((salt, encrypted_data))
 }
 
-fn derive_key_and_nonce(password: &str, salt: &SaltString) -> Result<(Aes256Gcm, [u8; 12]), FileError> {
+fn derive_key_and_nonce(
+    password: &str,
+    salt: &SaltString,
+) -> Result<(Aes256Gcm, [u8; 12]), FileError> {
     let argon2 = Argon2::default();
     let password_hash = argon2
         .hash_password(password.as_bytes(), salt)
@@ -50,16 +53,22 @@ fn derive_key_and_nonce(password: &str, salt: &SaltString) -> Result<(Aes256Gcm,
     Ok((key, nonce))
 }
 
-fn decrypt_data(key: &Aes256Gcm, nonce: &[u8; 12], encrypted_data: &mut Vec<u8>) -> Result<String, FileError> {
+fn decrypt_data(
+    key: &Aes256Gcm,
+    nonce: &[u8; 12],
+    encrypted_data: &mut [u8],
+) -> Result<String, FileError> {
     if encrypted_data.len() < 16 {
-        return Err(FileError::EncryptionError("Ciphertext too short".to_string()));
+        return Err(FileError::EncryptionError(
+            "Ciphertext too short".to_string(),
+        ));
     }
 
     let tag_start = encrypted_data.len() - 16;
     let tag_bytes: [u8; 16] = encrypted_data[tag_start..]
         .try_into()
         .map_err(|_| FileError::InvalidCiphertext("Invalid tag size".to_string()))?;
-    
+
     let ciphertext = &mut encrypted_data[..tag_start];
 
     key.decrypt_in_place_detached(Nonce::from_slice(nonce), b"", ciphertext, &tag_bytes.into())

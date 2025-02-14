@@ -1,0 +1,13 @@
+#!/bin/sh
+set -e 
+
+echo "Sekrets: Running post-removal cleanup..."
+
+case "$1" in
+    remove|purge)
+        USER=$(logname)
+        echo "Removing Sekrets configuration and data directories for user: $USER"
+
+        sudo -H -u "$USER" bash -c 'rm -rf ~/.local/share/sekrets ~/.config/sekrets' || true
+        ;;
+esac

@@ -1,0 +1,83 @@
+name: Release Sekrets
+
+on:
+  push:
+    tags:
+      - "v*"
+
+  workflow_run:
+    workflows: ["Rust"] 
+    types:
+      - completed
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build & Release Sekrets
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      # cache step for Cargo dependencies, binaries, and build artifacts
+      - name: Cache Cargo Dependencies, Binaries, and Build Artifacts
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.cargo/bin
+            target
+          key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-
+
+      - name: Install `cargo-deb`
+        run: |
+          if ! command -v cargo-deb &> /dev/null; then
+            cargo install cargo-deb
+          fi
+
+      - name: Extract and Format Version
+        run: echo "LIB_VERSION=$(echo $GITHUB_REF_NAME | sed -E 's/^v//')" >> $GITHUB_ENV
+
+      - name: Build Debian Package
+        run: cargo deb --deb-version "$LIB_VERSION"
+
+      - name: Build Release Binary
+        run: cargo build --release
+
+      - name: Package Release Files
+        run: |
+          mkdir sekrets-release
+          cp target/release/sekrets sekrets-release/
+          cp Makefile sekrets-release/
+          cd sekrets-release
+          tar -czvf sekrets-linux.tar.gz sekrets Makefile
+          mv sekrets-linux.tar.gz ../
+
+      - name: Create GitHub Release
+        env:
+          LIB_VERSION: ${{ env.LIB_VERSION }}
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            sekrets-linux.tar.gz
+            target/debian/*.deb
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: ${{ github.ref_name }}
+          name: "Sekrets ${{ github.ref_name }}"
+          body: |
+            🚀 **New release of Sekrets!** Install using `apt` or manually:
+            
+            ### 📥 Manual Install:
+            ```sh
+            wget https://github.com/ishtiaque05/sekrets/releases/download/${{ github.ref_name }}/sekrets_${{ env.LIB_VERSION }}_amd64.deb
+            sudo dpkg -i sekrets_${{ env.LIB_VERSION }}_amd64.deb
+            ```

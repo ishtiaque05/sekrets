@@ -19,12 +19,44 @@ jobs:
 
     - name: Install Rust (Stable)
       uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt, clippy
+
+    # Cache Cargo dependencies and build artifacts
+    - name: Cache Cargo Dependencies & Build Artifacts
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          cargo-${{ runner.os }}-
+
+    - name: Check Rust Formatting
+      run: cargo fmt --all -- --check
+  
+    - name: Lint with Clippy
+      run: make clippy 
 
     - name: Build
       run: cargo build --verbose
 
+    # Install `cargo-tarpaulin` with caching to avoid redundant installations
+    - name: Cache Cargo Binaries (Cargo Install)
+      uses: actions/cache@v3
+      with:
+        path: ~/.cargo/bin
+        key: cargo-bin-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          cargo-bin-${{ runner.os }}-
+
     - name: Install `cargo-tarpaulin`
-      run: cargo install cargo-tarpaulin --locked
+      run: |
+        if ! command -v cargo-tarpaulin &> /dev/null; then
+          cargo install cargo-tarpaulin --locked
+        fi
 
     - name: Run Test Coverage
       run: cargo tarpaulin --tests --all-targets --out xml
