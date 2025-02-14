@@ -17,8 +17,13 @@ jobs:
   build:
     name: Build & Release Sekrets
     runs-on: ubuntu-latest
-    # run this if Rust workflow pass and the event is push for tag
-    if: github.event_name == 'push' || github.event.workflow_run.conclusion == 'success'
+    
+    # ✅ Ensures the job runs only when:
+    # 1. A tag is pushed (`github.ref_type == 'tag'`)
+    # 2. Rust CI has passed (`workflow_run.conclusion == 'success'`)
+    if: >
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
 
     steps:
       - name: Checkout Repository
