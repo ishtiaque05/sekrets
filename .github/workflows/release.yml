@@ -25,9 +25,39 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install cargo-deb
-        run: cargo install cargo-deb
-      
+      # Cache Cargo dependencies (avoids re-downloading crates)
+      - name: Cache Cargo Dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/registry
+          key: cargo-registry-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-registry-${{ runner.os }}-
+
+      # Cache Build Artifacts (avoids recompiling unchanged code)
+      - name: Cache Build Artifacts
+        uses: actions/cache@v3
+        with:
+          path: target
+          key: cargo-build-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-build-${{ runner.os }}-
+
+      # Cache Cargo Installed Binaries (avoids reinstalling tools)
+      - name: Cache Cargo Binaries
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/bin
+          key: cargo-bin-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-bin-${{ runner.os }}-
+
+      - name: Install `cargo-deb`
+        run: |
+          if ! command -v cargo-deb &> /dev/null; then
+            cargo install cargo-deb
+          fi
+
       - name: Extract and Format Version
         run: echo "LIB_VERSION=$(echo $GITHUB_REF_NAME | sed -E 's/^v//; s/rc/~rc/')" >> $GITHUB_ENV
 
@@ -65,4 +95,3 @@ jobs:
             wget https://github.com/ishtiaque05/sekrets/releases/download/${{ github.ref_name }}/sekrets_${LIB_VERSION}_amd64.deb
             sudo dpkg -i sekrets_${{ github.ref_name }}_amd64.deb
             ```
-          

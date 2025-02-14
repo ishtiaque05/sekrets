@@ -63,6 +63,9 @@ jobs:
         if ! command -v cargo-tarpaulin &> /dev/null; then
           cargo install cargo-tarpaulin --locked
         fi
+        
+    - name: Run Test Coverage
+      run: cargo tarpaulin --tests --all-targets --out xml
     
     - name: Rename Coverage Report
       run: mv cobertura.xml coverage.xml 
