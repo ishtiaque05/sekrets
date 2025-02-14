@@ -25,32 +25,18 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      # Cache Cargo dependencies (avoids re-downloading crates)
-      - name: Cache Cargo Dependencies
+      # cache step for Cargo dependencies, binaries, and build artifacts
+      - name: Cache Cargo Dependencies, Binaries, and Build Artifacts
         uses: actions/cache@v3
         with:
-          path: ~/.cargo/registry
-          key: cargo-registry-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.cargo/bin
+            target
+          key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            cargo-registry-${{ runner.os }}-
-
-      # Cache Build Artifacts (avoids recompiling unchanged code)
-      - name: Cache Build Artifacts
-        uses: actions/cache@v3
-        with:
-          path: target
-          key: cargo-build-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            cargo-build-${{ runner.os }}-
-
-      # Cache Cargo Installed Binaries (avoids reinstalling tools)
-      - name: Cache Cargo Binaries
-        uses: actions/cache@v3
-        with:
-          path: ~/.cargo/bin
-          key: cargo-bin-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            cargo-bin-${{ runner.os }}-
+            cargo-${{ runner.os }}-
 
       - name: Install `cargo-deb`
         run: |
