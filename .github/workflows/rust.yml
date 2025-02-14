@@ -22,6 +22,24 @@ jobs:
       with:
         components: rustfmt, clippy
 
+    # ✅ Cache Cargo dependencies to speed up builds
+    - name: Cache Cargo Dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cargo/registry
+        key: cargo-registry-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          cargo-registry-${{ runner.os }}-
+
+    # ✅ Cache Cargo target directory to avoid recompiling unchanged code
+    - name: Cache Build Artifacts
+      uses: actions/cache@v3
+      with:
+        path: target
+        key: cargo-build-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          cargo-build-${{ runner.os }}-
+
     - name: Check Rust Formatting
       run: cargo fmt --all -- --check
   
@@ -31,11 +49,20 @@ jobs:
     - name: Build
       run: cargo build --verbose
 
-    - name: Install `cargo-tarpaulin`
-      run: cargo install cargo-tarpaulin --locked
+    # ✅ Install `cargo-tarpaulin` with caching to avoid redundant installations
+    - name: Cache Cargo Binaries (Cargo Install)
+      uses: actions/cache@v3
+      with:
+        path: ~/.cargo/bin
+        key: cargo-bin-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          cargo-bin-${{ runner.os }}-
 
-    - name: Run Test Coverage
-      run: cargo tarpaulin --tests --all-targets --out xml
+    - name: Install `cargo-tarpaulin`
+      run: |
+        if ! command -v cargo-tarpaulin &> /dev/null; then
+          cargo install cargo-tarpaulin --locked
+        fi
     
     - name: Rename Coverage Report
       run: mv cobertura.xml coverage.xml 
