@@ -15,13 +15,16 @@ fn read_encrypted_file(filename: &str) -> Result<(SaltString, Vec<u8>), FileErro
     let mut reader = BufReader::new(file);
 
     let mut salt_base64 = String::new();
+
     reader
         .read_line(&mut salt_base64)
         .map_err(|err| FileError::FileReadError(err.to_string()))?;
+
     let salt = SaltString::from_b64(salt_base64.trim())
         .map_err(|_| FileError::InvalidHashOutput("Invalid salt encoding".to_string()))?;
 
     let mut encrypted_data = Vec::new();
+    
     reader
         .read_to_end(&mut encrypted_data)
         .map_err(|err| FileError::FileReadError(err.to_string()))?;

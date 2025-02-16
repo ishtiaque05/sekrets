@@ -6,12 +6,13 @@ fn test_successful_credential_parsing() {
     let account = "my_account".to_string();
     let data = "my_account - username: user123, password: pass456\nanother_account - username: other, password: secret";
 
-    let credential = Credential::new(account.clone());
+    let credential = Parser::new(account.clone());
     let result = credential.get_credentials(data.to_string());
 
     expect_that!(
         result,
-        ok(eq(&ParseResult {
+        ok(eq(&Credential {
+            account: account,
             username: "user123".to_string(),
             password: "pass456".to_string()
         }))
@@ -23,7 +24,7 @@ fn test_account_not_found() {
     let account = "unknown_account".to_string();
     let data = "my_account - username: user123, password: pass456";
 
-    let credential = Credential::new(account.clone());
+    let credential = Parser::new(account.clone());
     let result = credential.get_credentials(data.to_string());
 
     expect_that!(
@@ -37,12 +38,13 @@ fn test_malformed_credentials() {
     let account = "my_account".to_string();
     let data = "my_account - username user123, password pass456";
 
-    let credential = Credential::new(account.clone());
+    let credential = Parser::new(account.clone());
     let result = credential.get_credentials(data.to_string());
 
     expect_that!(
         result,
-        ok(matches_pattern!(ParseResult {
+        ok(matches_pattern!(Credential {
+            account: eq(&account),
             username: eq(""),
             password: eq("")
         }))
@@ -56,12 +58,13 @@ fn test_multiple_accounts() {
                 account2 - username: user2, password: pass2\n\
                 account3 - username: user3, password: pass3";
 
-    let credential = Credential::new(account.clone());
+    let credential = Parser::new(account.clone());
     let result = credential.get_credentials(data.to_string());
 
     expect_that!(
         result,
-        ok(eq(&ParseResult {
+        ok(eq(&Credential {
+            account: account,
             username: "user2".to_string(),
             password: "pass2".to_string()
         }))
