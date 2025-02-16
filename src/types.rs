@@ -21,5 +21,5 @@ pub enum FileError {
     #[error("Decryption Error: {0}")]
     DecryptionError(String),
     #[error("File does not exist: {0}")]
-    DoesnotExist(String)
+    DoesnotExist(String),
 }

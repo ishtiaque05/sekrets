@@ -5,7 +5,11 @@ use std::io::Write;
 use tempfile::TempDir;
 
 use crate::{
-    cli::{build_cli, prompt_user_password, run}, decryptor, encryptor::{encrypt_file, ENCRYPTED_FILENAME}, paths::get_encrypted_file_path, tests::helpers::create_temp_plaintext_file
+    cli::{build_cli, prompt_user_password, run},
+    decryptor,
+    encryptor::{encrypt_file, ENCRYPTED_FILENAME},
+    paths::get_encrypted_file_path,
+    tests::helpers::create_temp_plaintext_file,
 };
 
 #[googletest::test]
@@ -125,10 +129,8 @@ fn test_prompt_user_password_mocked() {
     expect_that!(password, eq(&"foo".to_string()));
 }
 
-
 #[googletest::test]
 fn test_run_copy_command() {
-
     env::set_var("TEST_MODE", "1");
 
     let dest_dir = TempDir::new().expect("Failed to create destination directory");
@@ -136,7 +138,8 @@ fn test_run_copy_command() {
     let file_path = create_temp_plaintext_file("hello rust");
 
     let pass = prompt_user_password();
-    let _ = encrypt_file(file_path.path().to_str().unwrap(), &pass).expect("Failed to encrypt file");
+    let _ =
+        encrypt_file(file_path.path().to_str().unwrap(), &pass).expect("Failed to encrypt file");
 
     let matches = build_cli()
         .try_get_matches_from(vec![
@@ -164,7 +167,8 @@ fn test_run_append_command() {
     let file_path = create_temp_plaintext_file("github - username: foo, password: bar");
 
     let pass = prompt_user_password();
-    let _ = encrypt_file(file_path.path().to_str().unwrap(), &pass).expect("Failed to encrypt file");
+    let _ =
+        encrypt_file(file_path.path().to_str().unwrap(), &pass).expect("Failed to encrypt file");
 
     let matches = build_cli()
         .try_get_matches_from(vec![

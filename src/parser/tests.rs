@@ -12,7 +12,7 @@ fn test_successful_credential_parsing() {
     expect_that!(
         result,
         ok(eq(&Credential {
-            account: account,
+            account,
             username: "user123".to_string(),
             password: "pass456".to_string()
         }))
@@ -64,7 +64,7 @@ fn test_multiple_accounts() {
     expect_that!(
         result,
         ok(eq(&Credential {
-            account: account,
+            account,
             username: "user2".to_string(),
             password: "pass2".to_string()
         }))

@@ -1,10 +1,10 @@
 mod cli;
+mod credentials;
 mod decryptor;
 mod encryptor;
 mod parser;
 mod paths;
 mod types;
-mod credentials;
 
 use anyhow::Result;
 use cli::{build_cli, run};

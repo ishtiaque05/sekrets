@@ -1,4 +1,4 @@
-use crate::{ paths::get_encrypted_file_path, types::FileError};
+use crate::{paths::get_encrypted_file_path, types::FileError};
 use aes_gcm::{
     aead::{AeadInPlace, KeyInit},
     Aes256Gcm, Nonce,
@@ -79,9 +79,8 @@ fn write_encrypted_file(filepath: &str, salt: &SaltString, data: &[u8]) -> Resul
 }
 
 pub fn encrypt_file(filename: &str, password: &str) -> Result<String, FileError> {
-    
     let file_contents = read_file_contents(filename)?;
-    
+
     let encrypted_path = save_encrypted_file(file_contents, password)?;
     Ok(encrypted_path)
 }

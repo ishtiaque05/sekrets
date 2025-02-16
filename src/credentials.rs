@@ -1,4 +1,9 @@
-use crate::{decryptor, encryptor::{encrypt_text, ENCRYPTED_FILENAME}, paths::get_encrypted_file_path, types::FileError};
+use crate::{
+    decryptor,
+    encryptor::{encrypt_text, ENCRYPTED_FILENAME},
+    paths::get_encrypted_file_path,
+    types::FileError,
+};
 
 #[derive(Debug, PartialEq)]
 pub struct Credential {
@@ -12,7 +17,7 @@ impl Credential {
         Self {
             account,
             username,
-            password
+            password,
         }
     }
 
@@ -33,10 +38,11 @@ impl Credential {
             )));
         }
 
-        let decrypted_data = decryptor::decrypt_file(&encrypted_filepath.to_string_lossy(), password)?;
+        let decrypted_data =
+            decryptor::decrypt_file(&encrypted_filepath.to_string_lossy(), password)?;
 
         let new_entry = self.format_as_str();
-        
+
         let updated_data = format!("{}\n{}", decrypted_data.trim(), new_entry);
 
         encrypt_text(&updated_data, password)?;

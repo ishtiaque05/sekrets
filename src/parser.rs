@@ -40,7 +40,11 @@ impl Parser {
                     }
                 }
 
-                return Ok(Credential { account: self.account.clone(), username, password });
+                return Ok(Credential {
+                    account: self.account.clone(),
+                    username,
+                    password,
+                });
             }
         }
         Err(ParsingError::AccountNotFound(self.account.clone()))

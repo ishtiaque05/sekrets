@@ -24,7 +24,7 @@ fn read_encrypted_file(filename: &str) -> Result<(SaltString, Vec<u8>), FileErro
         .map_err(|_| FileError::InvalidHashOutput("Invalid salt encoding".to_string()))?;
 
     let mut encrypted_data = Vec::new();
-    
+
     reader
         .read_to_end(&mut encrypted_data)
         .map_err(|err| FileError::FileReadError(err.to_string()))?;

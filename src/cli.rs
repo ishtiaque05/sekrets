@@ -3,7 +3,11 @@ use std::{fs, path::Path};
 use clap::{Arg, ArgAction, ArgMatches, Command};
 
 use crate::{
-    credentials::Credential, decryptor, encryptor::{self, ENCRYPTED_FILENAME}, parser::Parser, paths::{self, get_encrypted_file_path}
+    credentials::Credential,
+    decryptor,
+    encryptor::{self, ENCRYPTED_FILENAME},
+    parser::Parser,
+    paths::{self, get_encrypted_file_path},
 };
 use anyhow::Result;
 
@@ -80,7 +84,7 @@ pub fn build_cli() -> Command {
                         .help("Password for the account")
                         .required(true)
                         .action(ArgAction::Set),
-                )
+                ),
         )
 }
 
@@ -128,12 +132,18 @@ pub fn run(matches: &ArgMatches) -> Result<()> {
             println!("Encrypted file copied to: {}", destination_path.display());
         }
         Some(("append", sub_matches)) => {
-            let account = sub_matches.get_one::<String>("account").expect("Account is required");
-            let username = sub_matches.get_one::<String>("username").expect("Username is required");
-            let password = sub_matches.get_one::<String>("password").expect("Password is required");
+            let account = sub_matches
+                .get_one::<String>("account")
+                .expect("Account is required");
+            let username = sub_matches
+                .get_one::<String>("username")
+                .expect("Username is required");
+            let password = sub_matches
+                .get_one::<String>("password")
+                .expect("Password is required");
 
             let user_password = prompt_user_password();
-            let new_credential = Credential::new(account.into(), username.into(), password.into()); 
+            let new_credential = Credential::new(account.into(), username.into(), password.into());
 
             new_credential.add_to_encrypted_file(&user_password)?;
         }
