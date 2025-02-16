@@ -14,10 +14,10 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    name: Build & Release Sekrets
+  build-linux:
+    name: Build & Release Sekrets (Linux)
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -27,87 +27,115 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      # Cache step for Cargo dependencies, binaries, and build artifacts
-      - name: Cache Cargo Dependencies, Binaries, and Build Artifacts
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            ~/.cargo/bin
-            target
-          key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            cargo-${{ runner.os }}-
-
       - name: Install `cargo-deb`
         run: |
           if ! command -v cargo-deb &> /dev/null; then
             cargo install cargo-deb
           fi
 
-      # Extract version without leading 'v'
-      - name: Extract and Format Version
-        run: echo "LIB_VERSION=$(echo $GITHUB_REF_NAME | sed -E 's/^v//')" >> $GITHUB_ENV
-
-      # Get the previous tag for comparison
-      - name: Find Previous Tag
-        id: prev_tag
-        run: echo "PREV_TAG=$(git describe --tags --abbrev=0 $(git rev-list --tags --skip=1 --max-count=1))" >> $GITHUB_ENV
-
-      # Generate the changelog (commit messages between tags)
-      - name: Generate Changelog
-        id: changelog
-        run: |
-          if [ -z "$PREV_TAG" ]; then
-            CHANGELOG=$(git log --pretty=format:'- %s' $(git rev-list --max-parents=0 HEAD)..HEAD | sed ':a;N;$!ba;s/\n/\\n/g')
-          else
-            CHANGELOG=$(git log --pretty=format:'- %s' $PREV_TAG..HEAD | sed ':a;N;$!ba;s/\n/\\n/g')
-          fi
-          echo "CHANGELOG<<EOF" >> $GITHUB_ENV
-          echo -e "$CHANGELOG" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
-
       - name: Build Debian Package
-        run: cargo deb --deb-version "$LIB_VERSION"
+        run: cargo deb --deb-version "$(echo $GITHUB_REF_NAME | sed -E 's/^v//')"
 
-      - name: Build Release Binary
+      - name: Build Linux Release Binary
         run: cargo build --release
 
-      - name: Package Release Files
+      - name: Package Linux Files
         run: |
-          mkdir sekrets-release
-          cp target/release/sekrets sekrets-release/
-          cp Makefile sekrets-release/
-          cd sekrets-release
-          tar -czvf sekrets-linux.tar.gz sekrets Makefile
-          mv sekrets-linux.tar.gz ../
+          mkdir sekrets-linux
+          cp target/release/sekrets sekrets-linux/
+          cp Makefile sekrets-linux/
+          tar -czvf sekrets-linux.tar.gz -C sekrets-linux .
+
+      - name: Upload Linux Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: sekrets-linux
+          path: |
+            sekrets-linux.tar.gz
+            target/debian/*.deb
+
+  build-macos:
+    name: Build & Release Sekrets (macOS)
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build macOS Release Binary
+        run: cargo build --release
+
+      - name: Create macOS Package (.pkg)
+        run: |
+          mkdir -p sekrets-macos/pkgroot/usr/local/bin
+          cp target/release/sekrets sekrets-macos/pkgroot/usr/local/bin/
+          
+          pkgbuild --identifier com.sekrets.app \
+                   --version "$(echo $GITHUB_REF_NAME | sed -E 's/^v//')" \
+                   --install-location /usr/local/bin \
+                   --root sekrets-macos/pkgroot \
+                   sekrets-macos.pkg
+
+      - name: Upload macOS Package
+        uses: actions/upload-artifact@v3
+        with:
+          name: sekrets-macos
+          path: sekrets-macos.pkg
+
+  release:
+    name: Create GitHub Release
+    needs: [build-linux, build-macos]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts
 
       - name: Create GitHub Release
         env:
-          LIB_VERSION: ${{ env.LIB_VERSION }}
-          PREV_TAG: ${{ env.PREV_TAG }}
-          CHANGELOG: ${{ env.CHANGELOG }}
+          LIB_VERSION: ${{ github.ref_name }}
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            sekrets-linux.tar.gz
-            target/debian/*.deb
+            artifacts/sekrets-linux/sekrets-linux.tar.gz
+            artifacts/sekrets-linux/*.deb
+            artifacts/sekrets-macos/sekrets-macos.pkg
           token: ${{ secrets.GITHUB_TOKEN }}
           tag_name: ${{ github.ref_name }}
-          name: "Sekrets ${{ env.LIB_VERSION }}"
+          name: "Sekrets ${{ github.ref_name }}"
           body: |
-            🚀 **New release of Sekrets ${{ env.LIB_VERSION }}**! 
+            🚀 **New release of Sekrets ${{ github.ref_name }}**! 
 
             ### 🔄 Changes:
-            ${{ env.CHANGELOG }}
+            - Bug fixes and improvements
 
             ### 🔍 Compare Changes:
-            [View Diff](https://github.com/ishtiaque05/sekrets/compare/${{ env.PREV_TAG }}...${{ github.ref_name }})
-            
-            ### 📥 Manual Install:
+            [View Diff](https://github.com/ishtiaque05/sekrets/compare/${{ github.ref_name }})
+
+            ### 📥 Installation Instructions:
+
+            **Linux (Debian-based)**
             ```sh
-            wget https://github.com/ishtiaque05/sekrets/releases/download/${{ github.ref_name }}/sekrets_${{ env.LIB_VERSION }}_amd64.deb
-            sudo dpkg -i sekrets_${{ env.LIB_VERSION }}_amd64.deb
+            wget https://github.com/ishtiaque05/sekrets/releases/download/${{ github.ref_name }}/sekrets_${{ github.ref_name }}_amd64.deb
+            sudo dpkg -i sekrets_${{ github.ref_name }}_amd64.deb
             ```
 
+            **Linux (Generic)**
+            ```sh
+            wget https://github.com/ishtiaque05/sekrets/releases/download/${{ github.ref_name }}/sekrets-linux.tar.gz
+            tar -xzf sekrets-linux.tar.gz
+            ./sekrets
+            ```
+
+            **macOS (Installer)**
+            ```sh
+            wget https://github.com/ishtiaque05/sekrets/releases/download/${{ github.ref_name }}/sekrets-macos.pkg
+            sudo installer -pkg sekrets-macos.pkg -target /
+            ```
