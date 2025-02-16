@@ -1,3 +1,5 @@
+use std::{fs, path::Path};
+
 use clap::{Arg, ArgAction, ArgMatches, Command};
 
 use crate::{
@@ -39,6 +41,19 @@ pub fn build_cli() -> Command {
                         .action(ArgAction::Append),
                 ),
         )
+        .subcommand(
+            Command::new("copy")
+                .about("Copy the encrypted file to a new location")
+                .arg(
+                    Arg::new("dest")
+                        .short('d')
+                        .long("dest")
+                        .value_name("DIR")
+                        .help("Destination directory for the encrypted file")
+                        .required(true)
+                        .action(ArgAction::Set),
+                ),
+        )
 }
 
 pub fn run(matches: &ArgMatches) -> Result<()> {
@@ -72,6 +87,17 @@ pub fn run(matches: &ArgMatches) -> Result<()> {
                     account, result.username, result.password
                 );
             }
+        }
+        Some(("copy", sub_matches)) => {
+            let dest_dir = sub_matches
+                .get_one::<String>("dest")
+                .expect("Destination directory is required");
+
+            let encrypted_filepath = get_encrypted_file_path(ENCRYPTED_FILENAME);
+            let destination_path = Path::new(dest_dir).join(ENCRYPTED_FILENAME);
+
+            fs::copy(&encrypted_filepath, &destination_path)?;
+            println!("Encrypted file copied to: {}", destination_path.display());
         }
         _ => unreachable!(),
     }
