@@ -3,8 +3,8 @@ mod decryptor;
 mod encryptor;
 mod parser;
 mod paths;
-pub mod tests;
 mod types;
+mod credentials;
 
 use anyhow::Result;
 use cli::{build_cli, run};
@@ -15,3 +15,5 @@ fn main() -> Result<()> {
     let matches = build_cli().get_matches();
     run(&matches)
 }
+
+pub mod tests;

@@ -3,10 +3,7 @@ use std::{fs, path::Path};
 use clap::{Arg, ArgAction, ArgMatches, Command};
 
 use crate::{
-    decryptor,
-    encryptor::{self, ENCRYPTED_FILENAME},
-    parser::{Credential, Parser},
-    paths::{self, get_encrypted_file_path},
+    credentials::Credential, decryptor, encryptor::{self, ENCRYPTED_FILENAME}, parser::Parser, paths::{self, get_encrypted_file_path}
 };
 use anyhow::Result;
 
