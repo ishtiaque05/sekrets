@@ -6,8 +6,44 @@ echo "Sekrets: Running post-removal cleanup..."
 case "$1" in
     remove|purge)
         USER=$(logname)
+        SEKRETS_FILE_LOCAL="/home/$USER/.local/share/sekrets/sekrets.enc"
+
         echo "Removing Sekrets configuration and data directories for user: $USER"
 
-        sudo -H -u "$USER" bash -c 'rm -rf ~/.local/share/sekrets ~/.config/sekrets' || true
+        # Find sekrets.enc inside ~/snap/sekrets/ (any subfolder)
+        SEKRETS_FILE_SNAP=$(find "/home/$USER/snap/sekrets" -type f -name "sekrets.enc" 2>/dev/null | head -n 1)
+
+        backup_sekret_file() {
+            FILE_PATH=$1
+            if [ -f "$FILE_PATH" ]; then
+                echo "⚠️ WARNING: Your secrets file ($FILE_PATH) will be deleted!"
+                echo "Would you like to copy it to a safe location before removal? (y/N)"
+
+                read -r confirm
+                if [ "$confirm" = "y" ] || [ "$confirm" = "Y" ]; then
+                    echo "Enter the full path where you want to save sekrets.enc:"
+                    read -r backup_location
+
+                    # Ensure the directory exists before proceeding
+                    if [ -d "$backup_location" ]; then
+                        cp "$FILE_PATH" "$backup_location/sekrets.enc"
+                        echo "✅ sekrets.enc has been copied to $backup_location"
+                    else
+                        echo "❌ Invalid directory. Skipping backup."
+                    fi
+                else
+                    echo "❗ Proceeding with removal without backup."
+                fi
+            fi
+        }
+
+        # Check and prompt for both local and snap directory
+        backup_sekret_file "$SEKRETS_FILE_LOCAL"
+        if [ -n "$SEKRETS_FILE_SNAP" ]; then
+            backup_sekret_file "$SEKRETS_FILE_SNAP"
+        fi
+
+        # Remove Sekrets config and data directories
+        sudo -H -u "$USER" bash -c 'rm -rf ~/.local/share/sekrets ~/.config/sekrets ~/snap/sekrets' || true
         ;;
 esac
