@@ -6,7 +6,10 @@ use tempfile::TempDir;
 
 use crate::{
     cli::{build_cli, prompt_user_password, run},
-    encryptor::encrypt_file,
+    decryptor,
+    encryptor::{encrypt_file, ENCRYPTED_FILENAME},
+    paths::get_encrypted_file_path,
+    tests::helpers::create_temp_plaintext_file,
 };
 
 #[googletest::test]
@@ -115,6 +118,8 @@ fn test_run_decrypt_command() {
     let result = run(&matches);
 
     expect_pred!(result.is_ok());
+
+    env::remove_var("TEST_MODE");
 }
 
 #[googletest::test]
@@ -122,4 +127,73 @@ fn test_prompt_user_password_mocked() {
     std::env::set_var("TEST_MODE", "1"); // Mock input
     let password = prompt_user_password();
     expect_that!(password, eq(&"foo".to_string()));
+}
+
+#[googletest::test]
+fn test_run_copy_command() {
+    env::set_var("TEST_MODE", "1");
+
+    let dest_dir = TempDir::new().expect("Failed to create destination directory");
+
+    let file_path = create_temp_plaintext_file("hello rust");
+
+    let pass = prompt_user_password();
+    let _ =
+        encrypt_file(file_path.path().to_str().unwrap(), &pass).expect("Failed to encrypt file");
+
+    let matches = build_cli()
+        .try_get_matches_from(vec![
+            "sekrets",
+            "copy",
+            "--dest",
+            dest_dir.path().to_str().expect("Failed to convert path"),
+        ])
+        .expect("Failed to parse arguments");
+
+    let result = run(&matches);
+
+    expect_pred!(result.is_ok());
+
+    let copied_file = dest_dir.path().join(ENCRYPTED_FILENAME);
+    expect_pred!(copied_file.exists());
+
+    env::remove_var("TEST_MODE");
+}
+
+#[googletest::test]
+fn test_run_append_command() {
+    env::set_var("TEST_MODE", "1");
+
+    let file_path = create_temp_plaintext_file("github - username: foo, password: bar");
+
+    let pass = prompt_user_password();
+    let _ =
+        encrypt_file(file_path.path().to_str().unwrap(), &pass).expect("Failed to encrypt file");
+
+    let matches = build_cli()
+        .try_get_matches_from(vec![
+            "sekrets",
+            "append",
+            "--account",
+            "bank",
+            "--username",
+            "john_doe",
+            "--password",
+            "mysecurepass",
+        ])
+        .expect("Failed to parse arguments");
+
+    let result = run(&matches);
+    expect_pred!(result.is_ok());
+
+    let encrypted_filepath = get_encrypted_file_path(ENCRYPTED_FILENAME);
+    let decrypted_data = decryptor::decrypt_file(&encrypted_filepath.to_string_lossy(), &pass)
+        .expect("Failed to decrypt file");
+
+    expect_that!(
+        decrypted_data,
+        contains_substring("bank - username: john_doe, password: mysecurepass")
+    );
+
+    env::remove_var("TEST_MODE");
 }

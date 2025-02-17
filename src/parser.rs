@@ -1,3 +1,5 @@
+use crate::credentials::Credential;
+
 #[derive(Debug, thiserror::Error)]
 pub enum ParsingError {
     #[error("Failed to parse credentials for account: `{0}'")]
@@ -5,22 +7,16 @@ pub enum ParsingError {
 }
 
 #[derive(Debug, Default)]
-pub struct Credential {
+pub struct Parser {
     pub account: String,
 }
 
-#[derive(Debug, PartialEq)]
-pub struct ParseResult {
-    pub username: String,
-    pub password: String,
-}
-
-impl Credential {
+impl Parser {
     pub fn new(account: String) -> Self {
         Self { account }
     }
 
-    pub fn get_credentials(&self, data: String) -> Result<ParseResult, ParsingError> {
+    pub fn get_credentials(&self, data: String) -> Result<Credential, ParsingError> {
         for line in data.lines() {
             let line = line.trim();
 
@@ -44,7 +40,11 @@ impl Credential {
                     }
                 }
 
-                return Ok(ParseResult { username, password });
+                return Ok(Credential {
+                    account: self.account.clone(),
+                    username,
+                    password,
+                });
             }
         }
         Err(ParsingError::AccountNotFound(self.account.clone()))

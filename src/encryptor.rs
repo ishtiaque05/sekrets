@@ -79,10 +79,16 @@ fn write_encrypted_file(filepath: &str, salt: &SaltString, data: &[u8]) -> Resul
 }
 
 pub fn encrypt_file(filename: &str, password: &str) -> Result<String, FileError> {
+    let file_contents = read_file_contents(filename)?;
+
+    let encrypted_path = save_encrypted_file(file_contents, password)?;
+    Ok(encrypted_path)
+}
+
+fn save_encrypted_file(mut data_bytes: Vec<u8>, password: &str) -> Result<String, FileError> {
     let (key, salt, nonce) = derive_encryption_key(password)?;
 
-    let mut file_contents = read_file_contents(filename)?;
-    let encrypted_data = encrypt_data(&key, &nonce, &mut file_contents)?;
+    let encrypted_data = encrypt_data(&key, &nonce, &mut data_bytes)?;
 
     let encrypted_filepath = get_encrypted_file_path(ENCRYPTED_FILENAME)
         .to_string_lossy()
@@ -92,5 +98,13 @@ pub fn encrypt_file(filename: &str, password: &str) -> Result<String, FileError>
 
     Ok(encrypted_filepath)
 }
+
+pub fn encrypt_text(data: &str, password: &str) -> Result<String, FileError> {
+    let data_bytes = data.as_bytes().to_vec();
+    let encrypted_path = save_encrypted_file(data_bytes, password)?;
+
+    Ok(encrypted_path)
+}
+
 #[cfg(test)]
 mod tests;

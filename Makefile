@@ -1,5 +1,5 @@
 APP_NAME=sekrets
-INSTALL_DIR=/usr/local/bin
+INSTALL_DIR=$(HOME)/.local/bin
 DATA_DIR=$(HOME)/.local/share/sekrets
 CONFIG_DIR=$(HOME)/.config/sekrets
 SNAP_BASE_DIR=$(HOME)/snap/code/
@@ -15,6 +15,10 @@ build:
 
 # Install the binary to /usr/local/bin
 install: build
+	@if [ ! -d "$(INSTALL_DIR)" ]; then \
+		echo "📁 Creating install directory: $(INSTALL_DIR)"; \
+		mkdir -p $(INSTALL_DIR); \
+	fi
 	sudo install -m 755 target/release/$(APP_NAME) $(BIN_PATH)
 	@echo "✅ Installed $(APP_NAME) to $(BIN_PATH)"
 	@if [ -d "$(DATA_DIR)" ]; then \

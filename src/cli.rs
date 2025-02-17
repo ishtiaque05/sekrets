@@ -1,9 +1,12 @@
+use std::{fs, path::Path};
+
 use clap::{Arg, ArgAction, ArgMatches, Command};
 
 use crate::{
+    credentials::Credential,
     decryptor,
     encryptor::{self, ENCRYPTED_FILENAME},
-    parser::Credential,
+    parser::Parser,
     paths::{self, get_encrypted_file_path},
 };
 use anyhow::Result;
@@ -39,6 +42,50 @@ pub fn build_cli() -> Command {
                         .action(ArgAction::Append),
                 ),
         )
+        .subcommand(
+            Command::new("copy")
+                .about("Copy the encrypted file to a new location")
+                .arg(
+                    Arg::new("dest")
+                        .short('d')
+                        .long("dest")
+                        .value_name("DIR")
+                        .help("Destination directory for the encrypted file")
+                        .required(true)
+                        .action(ArgAction::Set),
+                ),
+        )
+        .subcommand(
+            Command::new("append")
+                .about("Append new credentials to the encrypted file")
+                .arg(
+                    Arg::new("account")
+                        .short('a')
+                        .long("account")
+                        .value_name("ACCOUNT")
+                        .help("Account name")
+                        .required(true)
+                        .action(ArgAction::Set),
+                )
+                .arg(
+                    Arg::new("username")
+                        .short('u')
+                        .long("username")
+                        .value_name("USERNAME")
+                        .help("Username for the account")
+                        .required(true)
+                        .action(ArgAction::Set),
+                )
+                .arg(
+                    Arg::new("password")
+                        .short('p')
+                        .long("password")
+                        .value_name("PASSWORD")
+                        .help("Password for the account")
+                        .required(true)
+                        .action(ArgAction::Set),
+                ),
+        )
 }
 
 pub fn run(matches: &ArgMatches) -> Result<()> {
@@ -66,12 +113,39 @@ pub fn run(matches: &ArgMatches) -> Result<()> {
 
             for account in accounts {
                 let result =
-                    Credential::new(account.to_string()).get_credentials(decrypted_data.clone())?;
+                    Parser::new(account.to_string()).get_credentials(decrypted_data.clone())?;
                 println!(
                     "Account: {} - Username: {}, Password: {}",
                     account, result.username, result.password
                 );
             }
+        }
+        Some(("copy", sub_matches)) => {
+            let dest_dir = sub_matches
+                .get_one::<String>("dest")
+                .expect("Destination directory is required");
+
+            let encrypted_filepath = get_encrypted_file_path(ENCRYPTED_FILENAME);
+            let destination_path = Path::new(dest_dir).join(ENCRYPTED_FILENAME);
+
+            fs::copy(&encrypted_filepath, &destination_path)?;
+            println!("Encrypted file copied to: {}", destination_path.display());
+        }
+        Some(("append", sub_matches)) => {
+            let account = sub_matches
+                .get_one::<String>("account")
+                .expect("Account is required");
+            let username = sub_matches
+                .get_one::<String>("username")
+                .expect("Username is required");
+            let password = sub_matches
+                .get_one::<String>("password")
+                .expect("Password is required");
+
+            let user_password = prompt_user_password();
+            let new_credential = Credential::new(account.into(), username.into(), password.into());
+
+            new_credential.add_to_encrypted_file(&user_password)?;
         }
         _ => unreachable!(),
     }
