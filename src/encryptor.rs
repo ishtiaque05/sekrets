@@ -94,7 +94,6 @@ fn write_encrypted_file(filepath: &str, salt: &SaltString, data: &[u8]) -> Resul
 /// ```
 /// let result = encrypt_file("my_secret.txt", "strongpassword");
 /// ```
-
 pub fn encrypt_file(filename: &str, password: &str) -> Result<String, FileError> {
     let file_contents = read_file_contents(filename)?;
 
