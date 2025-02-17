@@ -5,14 +5,14 @@ echo "Sekrets: Running post-removal cleanup..."
 
 case "$1" in
     remove|purge)
-        # Get the real user
+        # Get the real user in different environments
         if [ -n "$SUDO_USER" ]; then
             USER="$SUDO_USER"
         else
-            USER=$(logname 2>/dev/null || echo "$USER")
+            USER=$(whoami | awk '{print $1}' 2>/dev/null || echo "$USER")
         fi
 
-        SEKRETS_FILE_LOCAL="/home/$USER/.local/share/sekrets/sekrets.enc"
+        SEKRETS_FILE_LOCAL="/home/$USER/.local/share/sekrets/encrypted/sekrets.enc"
         BACKUP_DIR="/home/$USER/sekrets_backup"
 
         echo "Removing Sekrets configuration and data directories for user: $USER"
@@ -20,9 +20,16 @@ case "$1" in
         # Find sekrets.enc dynamically inside ~/snap/sekrets/
         SEKRETS_FILE_SNAP=$(find "/home/$USER/snap/sekrets" -type f -name "sekrets.enc" 2>/dev/null | head -n 1)
 
-        # Check if running interactively
+        # Ensure the backup directory exists
+        mkdir -p "$BACKUP_DIR"
+
+        # Check if running interactively by verifying stdin
         is_interactive() {
-            [ -t 0 ] && [ -t 1 ]
+            if [ -t 0 ] || [ -n "$SSH_TTY" ]; then
+                return 0  # Interactive
+            else
+                return 1  # Non-interactive
+            fi
         }
 
         move_sekret_file() {
@@ -41,7 +48,6 @@ case "$1" in
                             echo "✅ sekrets.enc has been moved to $backup_location"
                         else
                             echo "❌ Invalid directory. Moving to default backup: $BACKUP_DIR"
-                            mkdir -p "$BACKUP_DIR"
                             mv "$FILE_PATH" "$BACKUP_DIR/"
                             echo "✅ sekrets.enc moved to $BACKUP_DIR"
                         fi
@@ -51,7 +57,6 @@ case "$1" in
                 else
                     echo "⚠️ WARNING: sekrets.enc ($FILE_PATH) is about to be deleted."
                     echo "Moving to default backup location: $BACKUP_DIR"
-                    mkdir -p "$BACKUP_DIR"
                     mv "$FILE_PATH" "$BACKUP_DIR/"
                     echo "✅ sekrets.enc has been moved to $BACKUP_DIR"
                 fi
@@ -63,7 +68,8 @@ case "$1" in
         if [ -n "$SEKRETS_FILE_SNAP" ]; then
             move_sekret_file "$SEKRETS_FILE_SNAP"
         fi
-
+        
+        echo "Removing..."
         # Remove Sekrets config and data directories
         sudo -H -u "$USER" bash -c 'rm -rf ~/.local/share/sekrets ~/.config/sekrets ~/snap/sekrets' || true
         ;;
