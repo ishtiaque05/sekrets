@@ -22,7 +22,6 @@ pub fn build_cli() -> Command {
         .add_decrypt_cmd()
         .add_copy_cmd()
         .add_append_cmd()
-        
 }
 
 trait SekretsCommand {
