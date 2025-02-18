@@ -89,25 +89,16 @@ impl SekretsCommand for Command {
                         .value_name("ACCOUNT")
                         .help("Account name")
                         .required(true)
-                        .action(ArgAction::Set),
+                        .action(ArgAction::Append),
                 )
                 .arg(
                     Arg::new("username")
                         .short('u')
                         .long("username")
                         .value_name("USERNAME")
-                        .help("Username for the account")
+                        .help("Username associated with the account")
                         .required(true)
-                        .action(ArgAction::Set),
-                )
-                .arg(
-                    Arg::new("password")
-                        .short('p')
-                        .long("password")
-                        .value_name("PASSWORD")
-                        .help("Password for the account")
-                        .required(true)
-                        .action(ArgAction::Set),
+                        .action(ArgAction::Append),
                 ),
         )
     }
@@ -157,20 +148,34 @@ pub fn run(matches: &ArgMatches) -> Result<()> {
             println!("Encrypted file copied to: {}", destination_path.display());
         }
         Some(("append", sub_matches)) => {
-            let account = sub_matches
-                .get_one::<String>("account")
-                .expect("Account is required");
-            let username = sub_matches
-                .get_one::<String>("username")
-                .expect("Username is required");
-            let password = sub_matches
-                .get_one::<String>("password")
-                .expect("Password is required");
+            let accounts: Vec<&String> = sub_matches
+                .get_many::<String>("account")
+                .expect("At least one account is required")
+                .collect();
 
-            let user_password = prompt_user_password();
-            let new_credential = Credential::new(account.into(), username.into(), password.into());
+            let usernames: Vec<&String> = sub_matches
+                .get_many::<String>("username")
+                .expect("Each account must have a username")
+                .collect();
+            
+            if accounts.len() != usernames.len() {
+                println!("Each account must have a corresponding username.");
+                return Err(anyhow::anyhow!("Mismatched accounts and usernames"));
+            }
 
-            new_credential.add_to_encrypted_file(&user_password)?;
+            let mut credentials = Vec::new();
+            for (account, username) in accounts.iter().zip(usernames.iter()) {
+                println!("Enter password credential for account: {}", account);
+                let password = prompt_user_password();
+                credentials.push(Credential::new((*account).to_string(), (*username).to_string(), password));
+            }
+
+            println!("Enter master password to decrypt the already encrypted file to add this new credentials");
+            let master_pass = prompt_user_password();
+
+            for cred in credentials {
+                cred.add_to_encrypted_file(&master_pass)?;
+            }
         }
         _ => unreachable!(),
     }
