@@ -78,6 +78,22 @@ fn write_encrypted_file(filepath: &str, salt: &SaltString, data: &[u8]) -> Resul
     Ok(())
 }
 
+/// Encrypts a file with the provided password.
+///
+/// # Arguments
+///
+/// * `filename` - The path to the file to be encrypted.
+/// * `password` - The password used for encryption.
+///
+/// # Returns
+///
+/// A `Result<String, FileError>` containing the path to the encrypted file or an error.
+///
+/// # Example
+///
+/// ```
+/// let result = encrypt_file("my_secret.txt", "strongpassword");
+/// ```
 pub fn encrypt_file(filename: &str, password: &str) -> Result<String, FileError> {
     let file_contents = read_file_contents(filename)?;
 

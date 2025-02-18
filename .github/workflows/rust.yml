@@ -43,6 +43,16 @@ jobs:
     - name: Build
       run: cargo build --verbose
 
+    # ENABLE this when repo is public 
+    # - name: Build documentation
+    #   run: cargo doc --no-deps
+
+    # - name: Deploy to GitHub Pages
+    #   uses: peaceiris/actions-gh-pages@v3
+    #   with:
+    #     github_token: ${{ secrets.GITHUB_TOKEN }}
+    #     publish_dir: ./target/doc
+
     # Install `cargo-tarpaulin` with caching to avoid redundant installations
     - name: Cache Cargo Binaries (Cargo Install)
       uses: actions/cache@v3

@@ -18,7 +18,22 @@ pub fn build_cli() -> Command {
         .about("Sssshhh it's a secret!!")
         .subcommand_required(true)
         .arg_required_else_help(true)
-        .subcommand(
+        .add_encrypt_cmd()
+        .add_decrypt_cmd()
+        .add_copy_cmd()
+        .add_append_cmd()
+}
+
+trait SekretsCommand {
+    fn add_encrypt_cmd(self) -> Self;
+    fn add_decrypt_cmd(self) -> Self;
+    fn add_copy_cmd(self) -> Self;
+    fn add_append_cmd(self) -> Self;
+}
+
+impl SekretsCommand for Command {
+    fn add_encrypt_cmd(self) -> Self {
+        self.subcommand(
             Command::new("encrypt").about("Encrypt a file").arg(
                 Arg::new("file")
                     .short('f')
@@ -29,7 +44,10 @@ pub fn build_cli() -> Command {
                     .action(ArgAction::Set),
             ),
         )
-        .subcommand(
+    }
+
+    fn add_decrypt_cmd(self) -> Self {
+        self.subcommand(
             Command::new("decrypt")
                 .about("Decrypt a file and retrieve account credentials")
                 .arg(
@@ -42,7 +60,10 @@ pub fn build_cli() -> Command {
                         .action(ArgAction::Append),
                 ),
         )
-        .subcommand(
+    }
+
+    fn add_copy_cmd(self) -> Self {
+        self.subcommand(
             Command::new("copy")
                 .about("Copy the encrypted file to a new location")
                 .arg(
@@ -55,7 +76,10 @@ pub fn build_cli() -> Command {
                         .action(ArgAction::Set),
                 ),
         )
-        .subcommand(
+    }
+
+    fn add_append_cmd(self) -> Self {
+        self.subcommand(
             Command::new("append")
                 .about("Append new credentials to the encrypted file")
                 .arg(
@@ -86,6 +110,7 @@ pub fn build_cli() -> Command {
                         .action(ArgAction::Set),
                 ),
         )
+    }
 }
 
 pub fn run(matches: &ArgMatches) -> Result<()> {
