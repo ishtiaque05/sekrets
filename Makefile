@@ -13,6 +13,9 @@ all: build
 build:
 	cargo build --release
 
+test: 
+	cargo test -- --test-threads=4 --nocapture
+
 # Install the binary to /usr/local/bin
 install: build
 	@if [ ! -d "$(INSTALL_DIR)" ]; then \
@@ -69,7 +72,7 @@ clean:
 	@echo "🧹 Cleaned up build and data directories"
 
 gen-cov:
-	 cargo tarpaulin --tests --all-targets --out html --output-dir ./coverage
+	 cargo tarpaulin --tests --all-targets --out html --output-dir ./coverage -- --test-threads=4 --nocapture
 
 
 install-deb:

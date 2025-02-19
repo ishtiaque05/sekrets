@@ -89,25 +89,16 @@ impl SekretsCommand for Command {
                         .value_name("ACCOUNT")
                         .help("Account name")
                         .required(true)
-                        .action(ArgAction::Set),
+                        .action(ArgAction::Append),
                 )
                 .arg(
                     Arg::new("username")
                         .short('u')
                         .long("username")
                         .value_name("USERNAME")
-                        .help("Username for the account")
+                        .help("Username associated with the account")
                         .required(true)
-                        .action(ArgAction::Set),
-                )
-                .arg(
-                    Arg::new("password")
-                        .short('p')
-                        .long("password")
-                        .value_name("PASSWORD")
-                        .help("Password for the account")
-                        .required(true)
-                        .action(ArgAction::Set),
+                        .action(ArgAction::Append),
                 ),
         )
     }
@@ -131,6 +122,7 @@ pub fn run(matches: &ArgMatches) -> Result<()> {
                 .get_many::<String>("accounts")
                 .expect("At least one account is required")
                 .collect();
+
             let password = prompt_user_password();
             let encrypted_filepath = get_encrypted_file_path(ENCRYPTED_FILENAME);
             let decrypted_data =
@@ -157,20 +149,53 @@ pub fn run(matches: &ArgMatches) -> Result<()> {
             println!("Encrypted file copied to: {}", destination_path.display());
         }
         Some(("append", sub_matches)) => {
-            let account = sub_matches
-                .get_one::<String>("account")
-                .expect("Account is required");
-            let username = sub_matches
-                .get_one::<String>("username")
-                .expect("Username is required");
-            let password = sub_matches
-                .get_one::<String>("password")
-                .expect("Password is required");
+            let accounts: Vec<&String> = sub_matches
+                .get_many::<String>("account")
+                .expect("At least one account is required")
+                .collect();
+            let usernames: Vec<&String> = sub_matches
+                .get_many::<String>("username")
+                .expect("Each account must have a username")
+                .collect();
 
-            let user_password = prompt_user_password();
-            let new_credential = Credential::new(account.into(), username.into(), password.into());
+            if accounts.len() != usernames.len() {
+                return Err(anyhow::anyhow!("Mismatched accounts and usernames"));
+            }
 
-            new_credential.add_to_encrypted_file(&user_password)?;
+            println!("Enter the password to decrypt file secret.enc");
+            let master_pass = prompt_user_password();
+            let encrypted_filepath = get_encrypted_file_path(ENCRYPTED_FILENAME);
+
+            if !encrypted_filepath.exists() {
+                return Err(anyhow::anyhow!(
+                    "{} does not exist! Encrypt file first",
+                    encrypted_filepath.display()
+                ));
+            }
+
+            let decrypted_data =
+                decryptor::decrypt_file(&encrypted_filepath.to_string_lossy(), &master_pass)?;
+            let mut new_data = decrypted_data.clone();
+
+            let credentials: Vec<Credential> = accounts
+                .iter()
+                .zip(usernames.iter())
+                .map(|(account, username)| {
+                    println!("Enter password credential for account: {}", account);
+                    Credential::new(
+                        (*account).to_string(),
+                        (*username).to_string(),
+                        prompt_user_password(),
+                    )
+                })
+                .collect();
+
+            for cred in &credentials {
+                new_data.push_str(&format!("\n{}", cred.format_as_str()));
+            }
+
+            encryptor::encrypt_text(&new_data, &master_pass)?;
+            println!("✅ Credentials successfully added!");
         }
         _ => unreachable!(),
     }
