@@ -162,6 +162,7 @@ pub fn run(matches: &ArgMatches) -> Result<()> {
                 return Err(anyhow::anyhow!("Mismatched accounts and usernames"));
             }
 
+            println!("Enter the password to decrypt file secret.enc");
             let master_pass = prompt_user_password();
             let encrypted_filepath = get_encrypted_file_path(ENCRYPTED_FILENAME);
 
