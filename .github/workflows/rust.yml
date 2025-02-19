@@ -69,7 +69,7 @@ jobs:
         fi
 
     - name: Run Test Coverage
-      run: cargo tarpaulin --tests --all-targets --out xml
+      run: cargo tarpaulin --tests --all-targets --out xml -- --test-threads=4 --nocapture
     
     - name: Rename Coverage Report
       run: mv cobertura.xml coverage.xml 
