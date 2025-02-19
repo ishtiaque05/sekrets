@@ -10,73 +10,131 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
-
+  setup:
+    name: Install Rust
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-    - name: Install Rust (Stable)
-      uses: dtolnay/rust-toolchain@stable
-      with:
-        components: rustfmt, clippy
+      - name: Install Rust (Stable)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
 
-    # Cache Cargo dependencies and build artifacts
-    - name: Cache Cargo Dependencies & Build Artifacts
-      uses: actions/cache@v3
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-        key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          cargo-${{ runner.os }}-
+  cache:
+    name: Cache Cargo Dependencies & Build Artifacts
+    runs-on: ubuntu-latest
+    needs: setup
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-    - name: Check Rust Formatting
-      run: cargo fmt --all -- --check
-  
-    - name: Lint with Clippy
-      run: make clippy 
+      - name: Cache Cargo Dependencies & Binaries
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.cargo/bin
+            target
+          key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-
 
-    - name: Build
-      run: cargo build --verbose
+  parallel-tasks:
+    name: Check Format, Lint, and Build
+    runs-on: ubuntu-latest
+    needs: cache
+    strategy:
+      matrix:
+        task: [fmt, clippy, build]
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-    # ENABLE this when repo is public 
-    # - name: Build documentation
-    #   run: cargo doc --no-deps
+      - name: Restore Cargo Cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.cargo/bin
+            target
+          key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
 
-    # - name: Deploy to GitHub Pages
-    #   uses: peaceiris/actions-gh-pages@v3
-    #   with:
-    #     github_token: ${{ secrets.GITHUB_TOKEN }}
-    #     publish_dir: ./target/doc
+      - name: Run Task
+        run: |
+          if [ "${{ matrix.task }}" = "fmt" ]; then
+            cargo fmt --all -- --check
+          elif [ "${{ matrix.task }}" = "clippy" ]; then
+            make clippy
+          elif [ "${{ matrix.task }}" = "build" ]; then
+            cargo build --verbose
+          fi
 
-    # Install `cargo-tarpaulin` with caching to avoid redundant installations
-    - name: Cache Cargo Binaries (Cargo Install)
-      uses: actions/cache@v3
-      with:
-        path: ~/.cargo/bin
-        key: cargo-bin-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          cargo-bin-${{ runner.os }}-
+  install-tarpaulin:
+    name: Install `cargo-tarpaulin`
+    runs-on: ubuntu-latest
+    needs: cache
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-    - name: Install `cargo-tarpaulin`
-      run: |
-        if ! command -v cargo-tarpaulin &> /dev/null; then
-          cargo install cargo-tarpaulin --locked
-        fi
+      - name: Restore Cargo Cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.cargo/bin
+            target
+          key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
 
-    - name: Run Test Coverage
-      run: cargo tarpaulin --tests --all-targets --out xml -- --test-threads=4 --nocapture
-    
-    - name: Rename Coverage Report
-      run: mv cobertura.xml coverage.xml 
+      - name: Install `cargo-tarpaulin`
+        run: |
+          if ! command -v cargo-tarpaulin &> /dev/null; then
+            cargo install cargo-tarpaulin --locked
+          fi
 
-    - name: Upload Coverage to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}  
-        files: coverage.xml
-        fail_ci_if_error: true
+  test-coverage:
+    name: Run Test Coverage
+    runs-on: ubuntu-latest
+    needs: install-tarpaulin
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Restore Cargo Cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.cargo/bin
+            target
+          key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run Test Coverage
+        run: cargo tarpaulin --tests --all-targets --out xml -- --test-threads=4 --nocapture
+
+  rename-coverage:
+    name: Rename Coverage Report
+    runs-on: ubuntu-latest
+    needs: test-coverage
+    steps:
+      - name: Rename Coverage Report
+        run: mv cobertura.xml coverage.xml
+
+  upload-coverage:
+    name: Upload Coverage to Codecov
+    runs-on: ubuntu-latest
+    needs: rename-coverage
+    steps:
+      - name: Upload Coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
+          fail_ci_if_error: true
