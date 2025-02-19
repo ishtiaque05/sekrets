@@ -122,6 +122,7 @@ pub fn run(matches: &ArgMatches) -> Result<()> {
                 .get_many::<String>("accounts")
                 .expect("At least one account is required")
                 .collect();
+
             let password = prompt_user_password();
             let encrypted_filepath = get_encrypted_file_path(ENCRYPTED_FILENAME);
             let decrypted_data =
@@ -152,30 +153,48 @@ pub fn run(matches: &ArgMatches) -> Result<()> {
                 .get_many::<String>("account")
                 .expect("At least one account is required")
                 .collect();
-
             let usernames: Vec<&String> = sub_matches
                 .get_many::<String>("username")
                 .expect("Each account must have a username")
                 .collect();
-            
+
             if accounts.len() != usernames.len() {
-                println!("Each account must have a corresponding username.");
                 return Err(anyhow::anyhow!("Mismatched accounts and usernames"));
             }
 
-            let mut credentials = Vec::new();
-            for (account, username) in accounts.iter().zip(usernames.iter()) {
-                println!("Enter password credential for account: {}", account);
-                let password = prompt_user_password();
-                credentials.push(Credential::new((*account).to_string(), (*username).to_string(), password));
-            }
-
-            println!("Enter master password to decrypt the already encrypted file to add this new credentials");
             let master_pass = prompt_user_password();
+            let encrypted_filepath = get_encrypted_file_path(ENCRYPTED_FILENAME);
 
-            for cred in credentials {
-                cred.add_to_encrypted_file(&master_pass)?;
+            if !encrypted_filepath.exists() {
+                return Err(anyhow::anyhow!(
+                    "{} does not exist! Encrypt file first",
+                    encrypted_filepath.display()
+                ));
             }
+
+            let decrypted_data =
+                decryptor::decrypt_file(&encrypted_filepath.to_string_lossy(), &master_pass)?;
+            let mut new_data = decrypted_data.clone();
+
+            let credentials: Vec<Credential> = accounts
+                .iter()
+                .zip(usernames.iter())
+                .map(|(account, username)| {
+                    println!("Enter password credential for account: {}", account);
+                    Credential::new(
+                        (*account).to_string(),
+                        (*username).to_string(),
+                        prompt_user_password(),
+                    )
+                })
+                .collect();
+
+            for cred in &credentials {
+                new_data.push_str(&format!("\n{}", cred.format_as_str()));
+            }
+
+            encryptor::encrypt_text(&new_data, &master_pass)?;
+            println!("✅ Credentials successfully added!");
         }
         _ => unreachable!(),
     }

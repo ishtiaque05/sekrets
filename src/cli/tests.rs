@@ -97,19 +97,10 @@ fn test_run_encrypt_command() {
 fn test_run_decrypt_command() {
     env::set_var("TEST_MODE", "1");
 
-    let temp_dir = TempDir::new().expect("Failed to create temporary directory");
-
-    let file_path = temp_dir.path().join("test_input.txt");
-
-    let mut file = File::create(&file_path).expect("Failed to create file");
-    writeln!(file, "github - username: foo, password: bar").expect("Failed to write to file");
-
-    let file_path_str = file_path
-        .to_str()
-        .expect("Failed to convert file path to string");
+    let file_path = create_temp_plaintext_file("github - username: foo, password: bar");
 
     let pass = prompt_user_password();
-    let _ = encrypt_file(file_path_str, &pass).expect("not to fail");
+    let _ = encrypt_file(file_path.path().to_str().unwrap(), &pass).expect("not to fail");
 
     let matches = build_cli()
         .try_get_matches_from(vec!["sekrets", "decrypt", "--accounts", "github"])
@@ -178,8 +169,6 @@ fn test_run_append_command() {
             "bank",
             "--username",
             "john_doe",
-            "--password",
-            "mysecurepass",
         ])
         .expect("Failed to parse arguments");
 
@@ -192,7 +181,113 @@ fn test_run_append_command() {
 
     expect_that!(
         decrypted_data,
-        contains_substring("bank - username: john_doe, password: mysecurepass")
+        contains_substring("bank - username: john_doe")
+    );
+
+    env::remove_var("TEST_MODE");
+}
+
+#[googletest::test]
+fn test_run_append_multiple_accounts() {
+    env::set_var("TEST_MODE", "1");
+
+    let file_path = create_temp_plaintext_file("github - username: foo, password: bar");
+
+    let pass = prompt_user_password();
+    let _ =
+        encrypt_file(file_path.path().to_str().unwrap(), &pass).expect("Failed to encrypt file");
+
+    let matches = build_cli()
+        .try_get_matches_from(vec![
+            "sekrets",
+            "append",
+            "--account",
+            "bank",
+            "--username",
+            "john_doe",
+            "--account",
+            "email",
+            "--username",
+            "alice_smith",
+        ])
+        .expect("Failed to parse arguments");
+
+    let result = run(&matches);
+    expect_pred!(result.is_ok());
+
+    let encrypted_filepath = get_encrypted_file_path(ENCRYPTED_FILENAME);
+    let decrypted_data = decryptor::decrypt_file(&encrypted_filepath.to_string_lossy(), &pass)
+        .expect("Failed to decrypt file");
+
+    expect_that!(
+        decrypted_data,
+        all!(
+            contains_substring("bank - username: john_doe"),
+            contains_substring("email - username: alice_smith")
+        )
+    );
+
+    env::remove_var("TEST_MODE");
+}
+
+#[googletest::test]
+fn test_run_append_mismatched_accounts_usernames() {
+    env::set_var("TEST_MODE", "1");
+
+    let file_path = create_temp_plaintext_file("github - username: foo, password: bar");
+
+    let pass = prompt_user_password();
+    let _ =
+        encrypt_file(file_path.path().to_str().unwrap(), &pass).expect("Failed to encrypt file");
+
+    let matches = build_cli()
+        .try_get_matches_from(vec![
+            "sekrets",
+            "append",
+            "--account",
+            "bank",
+            "--username",
+            "john_doe",
+            "--account",
+            "email",
+        ])
+        .expect("Failed to parse arguments");
+
+    let result = run(&matches);
+
+    expect_pred!(result.is_err());
+
+    let error_message = result.unwrap_err().to_string();
+    expect_that!(
+        error_message,
+        contains_substring("Mismatched accounts and usernames")
+    );
+
+    env::remove_var("TEST_MODE");
+}
+
+#[googletest::test]
+fn test_run_append_no_encrypted_file() {
+    env::set_var("TEST_MODE", "1");
+
+    let matches = build_cli()
+        .try_get_matches_from(vec![
+            "sekrets",
+            "append",
+            "--account",
+            "bank",
+            "--username",
+            "john_doe",
+        ])
+        .expect("Failed to parse arguments");
+
+    let result = run(&matches);
+    expect_pred!(result.is_err());
+
+    let error_message = result.unwrap_err().to_string();
+    expect_that!(
+        error_message,
+        contains_substring("does not exist! Encrypt file first")
     );
 
     env::remove_var("TEST_MODE");

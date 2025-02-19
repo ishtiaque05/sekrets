@@ -20,6 +20,4 @@ pub enum FileError {
     InvalidCiphertext(String),
     #[error("Decryption Error: {0}")]
     DecryptionError(String),
-    #[error("File does not exist: {0}")]
-    DoesnotExist(String),
 }
