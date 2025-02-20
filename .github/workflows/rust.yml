@@ -133,18 +133,13 @@ jobs:
           echo "Running test coverage..."
           cargo tarpaulin --tests --all-targets --out xml -- --test-threads=4 --nocapture
 
-  rename-coverage:
-    name: Rename Coverage Report
-    runs-on: ubuntu-latest
-    needs: test-coverage
-    steps:
       - name: Rename Coverage Report
         run: mv cobertura.xml coverage.xml
 
   upload-coverage:
     name: Upload Coverage to Codecov
     runs-on: ubuntu-latest
-    needs: rename-coverage
+    needs: test-coverage
     steps:
       - name: Upload Coverage to Codecov
         uses: codecov/codecov-action@v3
