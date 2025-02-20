@@ -23,7 +23,7 @@ jobs:
           components: rustfmt, clippy
 
   parallel-tasks:
-    name: Check Format, Lint, and Build
+    name: Check ${{ matrix.task }} 
     runs-on: ubuntu-latest
     needs: setup
     strategy:
@@ -129,7 +129,7 @@ jobs:
           cargo tarpaulin --version
 
           echo "Running test coverage..."
-          cargo tarpaulin --tests --all-targets --out xml -- --test-threads=4 --nocapture
+          cargo tarpaulin --tests --all-targets --cached --out xml -- --test-threads=4 --nocapture
 
       - name: Rename Coverage Report
         run: mv cobertura.xml coverage.xml
