@@ -135,12 +135,20 @@ jobs:
 
       - name: Rename Coverage Report
         run: mv cobertura.xml coverage.xml
+      - uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report
+          path: coverage.xml
 
   upload-coverage:
     name: Upload Coverage to Codecov
     runs-on: ubuntu-latest
     needs: test-coverage
     steps:
+      - name: Download Persisted Coverage Report
+        uses: actions/download-artifact@v3
+        with:
+          name: coverage-report
       - name: Upload Coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
