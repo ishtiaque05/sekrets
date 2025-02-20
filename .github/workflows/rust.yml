@@ -94,9 +94,13 @@ jobs:
 
       - name: Install `cargo-tarpaulin`
         run: |
-          echo "Adding ~/.cargo/bin to PATH"
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
           cargo install cargo-tarpaulin --locked
+
+      - name: Verify Tarpaulin Installation
+        run: |
+          echo "Checking if cargo-tarpaulin is installed..."
+          ls -lah ~/.cargo/bin
+          cargo tarpaulin --version || echo "Tarpaulin is still not found"
 
   test-coverage:
     name: Run Test Coverage
