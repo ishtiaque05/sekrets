@@ -32,7 +32,7 @@ enum Commands {
     /// Decrypt a file and retrieve credentials
     Decrypt {
         /// Account(s) for which to retrieve credentials
-        #[arg(short, long, required = true)]
+        #[arg(short, long = "account", required = true)]
         accounts: Vec<String>,
     },
 

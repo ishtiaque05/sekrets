@@ -40,9 +40,9 @@ fn test_cli_decrypt_parsing() {
         Cli::parse_from(vec![
             "sekrets",
             "decrypt",
-            "--accounts",
+            "--account",
             "github",
-            "--accounts",
+            "--account",
             "bank"
         ])
         .command,
@@ -59,7 +59,7 @@ fn test_decrypt_missing_args() {
     expect_pred!(result.is_err());
     expect_that!(
         result.unwrap_err().to_string(),
-        contains_substring("the following required arguments were not provided:\n  --accounts")
+        contains_substring("the following required arguments were not provided:\n  --account")
     );
 }
 
@@ -94,7 +94,7 @@ fn test_run_decrypt_command() {
     expect_pred!(run(Cli::parse_from(vec![
         "sekrets",
         "decrypt",
-        "--accounts",
+        "--account",
         "github"
     ]))
     .is_ok());
@@ -146,9 +146,9 @@ fn test_run_append_command() {
     expect_pred!(run(Cli::parse_from(vec![
         "sekrets",
         "append",
-        "--accounts",
+        "--account",
         "bank",
-        "--usernames",
+        "--username",
         "john_doe",
     ]))
     .is_ok());
@@ -179,11 +179,11 @@ fn test_run_append_mismatched_accounts_usernames() {
     let result = run(Cli::parse_from(vec![
         "sekrets",
         "append",
-        "--accounts",
+        "--account",
         "bank",
-        "--usernames",
+        "--username",
         "john_doe",
-        "--accounts",
+        "--account",
         "email",
     ]));
 
@@ -203,9 +203,9 @@ fn test_run_append_no_encrypted_file() {
     let result = run(Cli::parse_from(vec![
         "sekrets",
         "append",
-        "--accounts",
+        "--account",
         "bank",
-        "--usernames",
+        "--username",
         "john_doe",
     ]));
 
