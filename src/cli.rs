@@ -87,10 +87,13 @@ fn handle_decrypt(accounts: &[String]) -> Result<()> {
     for account in accounts {
         let credentials =
             CredentialParser::new(account.clone()).get_credentials(decrypted_data.clone())?;
-        println!(
-            "Account: {} - Username: {}, Password: {}",
-            account, credentials.username, credentials.password
-        );
+
+        for cred in credentials {
+            println!(
+                "Account: {} - Username: {}, Password: {}",
+                cred.account, cred.username, cred.password
+            );
+        }
     }
 
     Ok(())

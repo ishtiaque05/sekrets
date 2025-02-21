@@ -1,4 +1,4 @@
-#[derive(Debug, PartialEq)]
+#[derive(PartialEq, Eq, Debug)]
 pub struct Credential {
     pub account: String,
     pub username: String,

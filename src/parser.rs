@@ -1,8 +1,7 @@
 use crate::credentials::Credential;
-
 #[derive(Debug, thiserror::Error)]
 pub enum ParsingError {
-    #[error("Failed to parse credentials for account: `{0}'")]
+    #[error("No credentials found for account: `{0}'")]
     AccountNotFound(String),
 }
 
@@ -16,7 +15,9 @@ impl Parser {
         Self { account }
     }
 
-    pub fn get_credentials(&self, data: String) -> Result<Credential, ParsingError> {
+    pub fn get_credentials(&self, data: String) -> Result<Vec<Credential>, ParsingError> {
+        let mut credentials = Vec::new();
+
         for line in data.lines() {
             let line = line.trim();
 
@@ -29,25 +30,30 @@ impl Parser {
 
                 let credentials_part = parts[1];
 
-                let mut username: String = "".into();
-                let mut password: String = "".into();
+                let mut username = String::new();
+                let mut password = String::new();
 
                 for pair in credentials_part.split(", ") {
-                    if pair.starts_with("username:") {
-                        username = pair.trim_start_matches("username:").trim().to_string();
-                    } else if pair.starts_with("password:") {
-                        password = pair.trim_start_matches("password:").trim().to_string();
+                    if let Some(value) = pair.strip_prefix("username:") {
+                        username = value.trim().to_string();
+                    } else if let Some(value) = pair.strip_prefix("password:") {
+                        password = value.trim().to_string();
                     }
                 }
 
-                return Ok(Credential {
+                credentials.push(Credential {
                     account: self.account.clone(),
                     username,
                     password,
                 });
             }
         }
-        Err(ParsingError::AccountNotFound(self.account.clone()))
+
+        if credentials.is_empty() {
+            Err(ParsingError::AccountNotFound(self.account.clone()))
+        } else {
+            Ok(credentials)
+        }
     }
 }
 

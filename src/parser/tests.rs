@@ -1,3 +1,5 @@
+use std::vec;
+
 use super::*;
 use googletest::prelude::*;
 
@@ -11,11 +13,11 @@ fn test_successful_credential_parsing() {
 
     expect_that!(
         result,
-        ok(eq(&Credential {
+        ok(eq(&vec![Credential {
             account,
             username: "user123".to_string(),
             password: "pass456".to_string()
-        }))
+        }]))
     )
 }
 
@@ -43,30 +45,41 @@ fn test_malformed_credentials() {
 
     expect_that!(
         result,
-        ok(matches_pattern!(Credential {
-            account: eq(&account),
-            username: eq(""),
-            password: eq("")
-        }))
+        ok(eq(&vec![Credential {
+            account: account,
+            username: "".into(),
+            password: "".into()
+        }]))
     )
 }
 
 #[googletest::test]
 fn test_multiple_accounts() {
-    let account = "account2".to_string();
-    let data = "account1 - username: user1, password: pass1\n\
-                account2 - username: user2, password: pass2\n\
+    let account = "account".to_string();
+    let data = "account - username: user1, password: pass1\n\
+                account - username: user2, password: pass2\n\
                 account3 - username: user3, password: pass3";
 
-    let credential = Parser::new(account.clone());
-    let result = credential.get_credentials(data.to_string());
+    let parser = Parser::new(account.clone());
+    let result = parser.get_credentials(data.to_string());
+
+    expect_pred!(result.is_ok()); // Ensure the result is Ok
+
+    let credentials = result.unwrap(); // Extract Vec<Credential>
 
     expect_that!(
-        result,
-        ok(eq(&Credential {
-            account,
-            username: "user2".to_string(),
-            password: "pass2".to_string()
-        }))
+        credentials,
+        contains_each![
+            eq(&Credential {
+                account: account.clone(),
+                username: "user1".to_string(),
+                password: "pass1".to_string(),
+            }),
+            eq(&Credential {
+                account: account.clone(),
+                username: "user2".to_string(),
+                password: "pass2".to_string(),
+            }),
+        ]
     );
 }
