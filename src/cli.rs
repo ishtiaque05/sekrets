@@ -46,11 +46,11 @@ enum Commands {
     /// Append new credentials to the encrypted file
     Append {
         /// Account names
-        #[arg(short, long="account", required = true)]
+        #[arg(short, long = "account", required = true)]
         accounts: Vec<String>,
 
         /// Corresponding usernames
-        #[arg(short, long="username", required = true)]
+        #[arg(short, long = "username", required = true)]
         usernames: Vec<String>,
     },
 }
