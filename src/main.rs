@@ -7,13 +7,13 @@ mod paths;
 mod types;
 
 use anyhow::Result;
-use cli::{build_cli, run};
+use clap::Parser;
+use cli::{run, Cli};
 
 fn main() -> Result<()> {
-    paths::ensure_dirs();
+    let cli = Cli::parse();
 
-    let matches = build_cli().get_matches();
-    run(&matches)
+    run(cli)
 }
 
 pub mod tests;
