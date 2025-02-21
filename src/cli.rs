@@ -146,7 +146,7 @@ fn generate_new_credentials(
         .iter()
         .zip(usernames.iter())
         .map(|(account, username)| {
-            println!("Enter password credential for account: {}", account);
+            println!("Enter password credential for account: {}, username: {}", account, username);
 
             Credential::new(account.clone(), username.clone(), prompt_user_password())
         })
