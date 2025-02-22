@@ -47,7 +47,8 @@ fn test_cli_decrypt_parsing() {
         ])
         .command,
         eq(&Commands::Decrypt {
-            accounts: vec!["github".to_string(), "bank".to_string()]
+            accounts: vec!["github".to_string(), "bank".to_string()],
+            usernames: vec![]
         })
     );
 }

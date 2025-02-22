@@ -8,8 +8,8 @@ fn test_successful_credential_parsing() {
     let account = "my_account".to_string();
     let data = "my_account - username: user123, password: pass456\nanother_account - username: other, password: secret";
 
-    let credential = Parser::new(account.clone());
-    let result = credential.get_credentials(data.to_string());
+    let credential = Parser::new(data.into());
+    let result = credential.get_credentials(None, account.clone());
 
     expect_that!(
         result,
@@ -26,8 +26,8 @@ fn test_account_not_found() {
     let account = "unknown_account".to_string();
     let data = "my_account - username: user123, password: pass456";
 
-    let credential = Parser::new(account.clone());
-    let result = credential.get_credentials(data.to_string());
+    let credential = Parser::new(data.to_string());
+    let result = credential.get_credentials(None, account);
 
     expect_that!(
         result,
@@ -38,15 +38,15 @@ fn test_account_not_found() {
 #[googletest::test]
 fn test_malformed_credentials() {
     let account = "my_account".to_string();
-    let data = "my_account - username user123, password pass456";
+    let data = "my_account - username user123, password pass456".to_string();
 
-    let credential = Parser::new(account.clone());
-    let result = credential.get_credentials(data.to_string());
+    let credential = Parser::new(data);
+    let result = credential.get_credentials(None, account.clone());
 
     expect_that!(
         result,
         ok(eq(&vec![Credential {
-            account: account,
+            account,
             username: "".into(),
             password: "".into()
         }]))
@@ -58,10 +58,11 @@ fn test_multiple_accounts() {
     let account = "account".to_string();
     let data = "account - username: user1, password: pass1\n\
                 account - username: user2, password: pass2\n\
-                account3 - username: user3, password: pass3";
+                account3 - username: user3, password: pass3"
+        .to_string();
 
-    let parser = Parser::new(account.clone());
-    let result = parser.get_credentials(data.to_string());
+    let parser = Parser::new(data);
+    let result = parser.get_credentials(None, account.clone());
 
     expect_pred!(result.is_ok()); // Ensure the result is Ok
 
@@ -76,7 +77,7 @@ fn test_multiple_accounts() {
                 password: "pass1".to_string(),
             }),
             eq(&Credential {
-                account: account.clone(),
+                account,
                 username: "user2".to_string(),
                 password: "pass2".to_string(),
             }),
