@@ -1,6 +1,7 @@
 use std::vec;
 
 use super::*;
+use crate::parser::ParsingError::AccountWithUsernameNotFound;
 use googletest::prelude::*;
 
 #[googletest::test]
@@ -64,9 +65,9 @@ fn test_multiple_accounts() {
     let parser = Parser::new(data);
     let result = parser.get_credentials(None, account.clone());
 
-    expect_pred!(result.is_ok()); // Ensure the result is Ok
+    expect_pred!(result.is_ok());
 
-    let credentials = result.unwrap(); // Extract Vec<Credential>
+    let credentials = result.unwrap();
 
     expect_that!(
         credentials,
@@ -82,5 +83,51 @@ fn test_multiple_accounts() {
                 password: "pass2".to_string(),
             }),
         ]
+    );
+}
+
+#[googletest::test]
+fn test_username_account_match() {
+    let account = "account".to_string();
+    let data = "account - username: user1, password: pass1\n\
+                account - username: user2, password: pass2\n\
+                account3 - username: user3, password: pass3"
+        .to_string();
+
+    let parser = Parser::new(data);
+    let result = parser.get_credentials(Some("user2".to_string()), account.clone());
+
+    expect_pred!(result.is_ok());
+
+    let credentials = result.unwrap();
+    expect_pred!(credentials.len() == 1);
+
+    expect_that!(
+        credentials[0],
+        eq(&Credential {
+            account: account.clone(),
+            username: "user2".to_string(),
+            password: "pass2".to_string(),
+        }),
+    );
+}
+
+#[googletest::test]
+fn test_username_doesnot_match() {
+    let account = "account".to_string();
+    let data = "account - username: user1, password: pass1\n\
+                account - username: user2, password: pass2\n\
+                account3 - username: user3, password: pass3"
+        .to_string();
+
+    let parser = Parser::new(data);
+    let result = parser.get_credentials(Some("foo".to_string()), account.clone());
+
+    expect_that!(
+        result,
+        err(matches_pattern!(AccountWithUsernameNotFound(
+            eq("account"),
+            eq("foo")
+        )))
     );
 }

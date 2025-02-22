@@ -54,6 +54,29 @@ fn test_cli_decrypt_parsing() {
 }
 
 #[googletest::test]
+fn test_cli_decrypt_parsing_with_username() {
+    expect_that!(
+        Cli::parse_from(vec![
+            "sekrets",
+            "decrypt",
+            "--account",
+            "github",
+            "--account",
+            "bank",
+            "--username",
+            "foo",
+            "-u",
+            "bar"
+        ])
+        .command,
+        eq(&Commands::Decrypt {
+            accounts: vec!["github".to_string(), "bank".to_string()],
+            usernames: vec!["foo".to_string(), "bar".to_string()]
+        })
+    );
+}
+
+#[googletest::test]
 fn test_decrypt_missing_args() {
     let result = Cli::try_parse_from(vec!["sekrets", "decrypt"]);
 
