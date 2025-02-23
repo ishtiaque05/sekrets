@@ -34,6 +34,9 @@ enum Commands {
         /// Account(s) for which to retrieve credentials
         #[arg(short, long = "account", required = true)]
         accounts: Vec<String>,
+
+        #[arg(short, long = "username", required = false)]
+        usernames: Vec<String>,
     },
 
     /// Copy the encrypted file to a new location
@@ -60,7 +63,10 @@ pub fn run(cli: Cli) -> Result<()> {
 
     match cli.command {
         Commands::Encrypt { file } => handle_encrypt(&file),
-        Commands::Decrypt { accounts } => handle_decrypt(&accounts),
+        Commands::Decrypt {
+            accounts,
+            usernames,
+        } => handle_decrypt(&accounts, &usernames),
         Commands::Copy { dest } => handle_copy(&dest),
         Commands::Append {
             accounts,
@@ -79,18 +85,47 @@ fn handle_encrypt(file: &str) -> Result<()> {
     Ok(())
 }
 
-fn handle_decrypt(accounts: &[String]) -> Result<()> {
+fn handle_decrypt(accounts: &[String], usernames: &[String]) -> Result<()> {
     let password = prompt_user_password();
     let encrypted_filepath = get_encrypted_file_path(ENCRYPTED_FILENAME);
-    let decrypted_data = decryptor::decrypt_file(&encrypted_filepath.to_string_lossy(), &password)?;
 
-    for account in accounts {
-        let credentials =
-            CredentialParser::new(account.clone()).get_credentials(decrypted_data.clone())?;
-        println!(
-            "Account: {} - Username: {}, Password: {}",
-            account, credentials.username, credentials.password
-        );
+    if usernames.is_empty() {
+        let decrypted_data =
+            decryptor::decrypt_file(&encrypted_filepath.to_string_lossy(), &password)?;
+        let parser = CredentialParser::new(decrypted_data);
+
+        for account in accounts {
+            let credentials = parser.get_credentials(None, account.to_string())?;
+            for cred in credentials {
+                println!(
+                    "Account: {} - Username: {}, Password: {}",
+                    cred.account, cred.username, cred.password
+                );
+            }
+        }
+    } else {
+        if accounts.len() != usernames.len() {
+            return Err(anyhow::anyhow!("Mismatched accounts and usernames"));
+        }
+        let decrypted_data =
+            decryptor::decrypt_file(&encrypted_filepath.to_string_lossy(), &password)?;
+        let parser = CredentialParser::new(decrypted_data);
+
+        for (account, username) in accounts.iter().zip(usernames.iter()) {
+            match parser.get_credentials(Some(username.to_string()), account.to_string()) {
+                Ok(credentials) => {
+                    for cred in credentials {
+                        println!(
+                            "Account: {} - Username: {}, Password: {}",
+                            cred.account, cred.username, cred.password
+                        );
+                    }
+                }
+                Err(e) => {
+                    println!("{}", e);
+                }
+            }
+        }
     }
 
     Ok(())
@@ -143,7 +178,10 @@ fn generate_new_credentials(
         .iter()
         .zip(usernames.iter())
         .map(|(account, username)| {
-            println!("Enter password credential for account: {}", account);
+            println!(
+                "Enter password credential for account: {}, username: {}",
+                account, username
+            );
 
             Credential::new(account.clone(), username.clone(), prompt_user_password())
         })
@@ -159,11 +197,12 @@ fn generate_new_credentials(
 #[cfg(not(test))]
 pub fn prompt_user_password() -> String {
     if std::env::var("TEST_MODE").is_ok() {
-        return "foo".to_string();
+        "foo".to_string()
+    } else {
+        use rpassword::read_password;
+        println!("Enter password: ");
+        read_password().expect("Failed to read password")
     }
-    use rpassword::read_password;
-    println!("Enter password: ");
-    read_password().expect("Failed to read password")
 }
 
 #[cfg(test)]

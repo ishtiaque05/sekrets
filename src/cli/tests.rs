@@ -47,7 +47,31 @@ fn test_cli_decrypt_parsing() {
         ])
         .command,
         eq(&Commands::Decrypt {
-            accounts: vec!["github".to_string(), "bank".to_string()]
+            accounts: vec!["github".to_string(), "bank".to_string()],
+            usernames: vec![]
+        })
+    );
+}
+
+#[googletest::test]
+fn test_cli_decrypt_parsing_with_username() {
+    expect_that!(
+        Cli::parse_from(vec![
+            "sekrets",
+            "decrypt",
+            "--account",
+            "github",
+            "--account",
+            "bank",
+            "--username",
+            "foo",
+            "-u",
+            "bar"
+        ])
+        .command,
+        eq(&Commands::Decrypt {
+            accounts: vec!["github".to_string(), "bank".to_string()],
+            usernames: vec!["foo".to_string(), "bar".to_string()]
         })
     );
 }
@@ -61,6 +85,37 @@ fn test_decrypt_missing_args() {
         result.unwrap_err().to_string(),
         contains_substring("the following required arguments were not provided:\n  --account")
     );
+}
+
+#[googletest::test]
+fn test_decrypt_account_not_equal_username() {
+    let result = run(Cli::parse_from(vec![
+        "sekrets", "decrypt", "-a", "bank", "-u", "foo", "-a", "bar",
+    ]));
+
+    expect_pred!(result.is_err());
+    expect_that!(
+        result.unwrap_err().to_string(),
+        contains_substring("Mismatched accounts and usernames")
+    );
+}
+
+#[googletest::test]
+fn test_decrypt_account_equal_username() {
+    env::set_var("TEST_MODE", "1");
+
+    let file_path = create_temp_plaintext_file(
+        "github - username: foo, password: bar\nbank - username: abc, password: efg",
+    );
+
+    let pass = prompt_user_password();
+    let _ = encrypt_file(file_path.path().to_str().unwrap(), &pass).expect("Encryption failed");
+
+    let result = run(Cli::parse_from(vec![
+        "sekrets", "decrypt", "-a", "bank", "-u", "abc", "-a", "github", "-u", "foo",
+    ]));
+
+    expect_pred!(result.is_ok());
 }
 
 #[googletest::test]
@@ -80,6 +135,8 @@ fn test_run_encrypt_command() {
         file_path.to_str().unwrap()
     ]))
     .is_ok());
+
+    expect_pred!(get_encrypted_file_path(ENCRYPTED_FILENAME).exists())
 }
 
 #[googletest::test]
