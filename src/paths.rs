@@ -36,12 +36,13 @@ pub fn get_encrypted_file_path(file_name: &str) -> PathBuf {
         fs::create_dir_all(&temp_dir).expect("Failed to create test temp directory");
 
         return temp_dir.join(file_name);
+    } else {
+        let mut path = get_data_path();
+        path.push("encrypted");
+        fs::create_dir_all(&path).expect("Failed to create encrypted files directory");
+        path.push(file_name);
+        path
     }
-    let mut path = get_data_path();
-    path.push("encrypted");
-    fs::create_dir_all(&path).expect("Failed to create encrypted files directory");
-    path.push(file_name);
-    path
 }
 
 #[cfg(test)]

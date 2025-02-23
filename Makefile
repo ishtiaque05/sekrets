@@ -72,7 +72,7 @@ clean:
 	@echo "🧹 Cleaned up build and data directories"
 
 gen-cov:
-	 cargo tarpaulin --tests --all-targets --out html --output-dir ./coverage -- --test-threads=4 --nocapture
+	 cargo tarpaulin --tests --all-targets --out html --output-dir ./coverage -- --test-threads=1 --nocapture
 
 
 install-deb:

@@ -1,11 +1,22 @@
 use assert_cmd::Command;
 use googletest::expect_pred;
 use predicates::prelude::*;
-use std::{env, fs::File, io::Write, path::Path};
+use std::{
+    env,
+    fs::{self, File},
+    io::Write,
+    path::{Path, PathBuf},
+    thread,
+    time::Duration,
+};
 use tempfile::{NamedTempFile, TempDir};
 
 fn create_temp_plaintext_file(content: &str) -> NamedTempFile {
-    let temp_file = NamedTempFile::new().expect("Failed to create temp file");
+    let tmp_dir = TestCleanup::root_path();
+    if !tmp_dir.exists() {
+        fs::create_dir_all(&tmp_dir).expect("Failed to create test temp directory");
+    }
+    let temp_file = NamedTempFile::new_in(tmp_dir).expect("Failed to create temp file");
     let mut file = File::create(temp_file.path()).expect("Failed to open temp file");
 
     file.write_all(content.as_bytes())
@@ -18,14 +29,39 @@ fn create_temp_plaintext_file(content: &str) -> NamedTempFile {
 
 fn run_sekrets_command(args: &[&str]) -> assert_cmd::Command {
     let mut cmd = Command::cargo_bin("sekrets").unwrap();
-    cmd.args(args);
+    cmd.env("TEST_MODE", "1").args(args);
+
     cmd
+}
+
+struct TestCleanup;
+
+impl TestCleanup {
+    fn root_path() -> PathBuf {
+        let project_root = env::var("CARGO_MANIFEST_DIR").unwrap();
+
+        PathBuf::from(project_root).join("tmp")
+    }
+    fn clean() {
+        let tmp_folder = Self::root_path();
+
+        if tmp_folder.exists() {
+            if fs::remove_dir_all(tmp_folder).is_ok() {
+                return;
+            }
+        }
+        thread::sleep(Duration::from_millis(100))
+    }
+}
+
+impl Drop for TestCleanup {
+    fn drop(&mut self) {
+        Self::clean();
+    }
 }
 
 #[googletest::test]
 fn test_full_encrypt_decrypt_flow() {
-    env::set_var("TEST_MODE", "1");
-
     let plaintext_file = create_temp_plaintext_file("github - username: foo, password: bar");
 
     run_sekrets_command(&["encrypt", "-f", plaintext_file.path().to_str().unwrap()])
@@ -40,14 +76,13 @@ fn test_full_encrypt_decrypt_flow() {
         .stdout(predicate::str::contains("Account: github - Username:"))
         .stdout(predicate::str::contains("Password:"));
 
-    env::remove_var("TEST_MODE");
+    TestCleanup::clean();
 }
 
 #[googletest::test]
 fn test_append_flow() {
-    env::set_var("TEST_MODE", "1");
-
     let plaintext_file = create_temp_plaintext_file("bank - username: foo, password: bar");
+
     run_sekrets_command(&["encrypt", "-f", plaintext_file.path().to_str().unwrap()])
         .assert()
         .success();
@@ -69,16 +104,17 @@ fn test_append_flow() {
             "Account: bank - Username: user2, Password: foo",
         ));
 
-    env::remove_var("TEST_MODE");
+    TestCleanup::clean();
 }
 
 #[googletest::test]
 fn test_decrypt_with_username_and_account_match() {
-    env::set_var("TEST_MODE", "1");
+    let _cleanup = TestCleanup;
 
     let plaintext_file = create_temp_plaintext_file(
         "bank - username: user1, password: foo\nbank - username: user2, password: bar",
     );
+
     run_sekrets_command(&["encrypt", "-f", plaintext_file.path().to_str().unwrap()])
         .assert()
         .success();
@@ -91,16 +127,15 @@ fn test_decrypt_with_username_and_account_match() {
             "Account: bank - Username: user2, Password: bar",
         ));
 
-    env::remove_var("TEST_MODE");
+    TestCleanup::clean();
 }
 
 #[googletest::test]
 fn test_decrypt_with_username_and_account_not_match() {
-    env::set_var("TEST_MODE", "1");
-
     let plaintext_file = create_temp_plaintext_file(
         "bank - username: user1, password: foo\nbank - username: user2, password: bar",
     );
+
     run_sekrets_command(&["encrypt", "-f", plaintext_file.path().to_str().unwrap()])
         .assert()
         .success();
@@ -125,16 +160,15 @@ fn test_decrypt_with_username_and_account_not_match() {
         "Account: bank - Username: user2, Password: bar",
     ));
 
-    env::remove_var("TEST_MODE");
+    TestCleanup::clean();
 }
 
 #[googletest::test]
 fn test_decrypt_with_multiple_account_match() {
-    env::set_var("TEST_MODE", "1");
-
     let plaintext_file = create_temp_plaintext_file(
         "bank - username: user1, password: foo\nbank - username: user2, password: bar",
     );
+
     run_sekrets_command(&["encrypt", "-f", plaintext_file.path().to_str().unwrap()])
         .assert()
         .success();
@@ -149,27 +183,30 @@ fn test_decrypt_with_multiple_account_match() {
             "Account: bank - Username: user2, Password: bar",
         ));
 
-    env::remove_var("TEST_MODE");
+    TestCleanup::clean();
 }
 
 #[googletest::test]
 fn test_copy() {
-    env::set_var("TEST_MODE", "1");
-
     let temp_dir = TempDir::new().expect("Failed to create temporary directory");
     let plaintext_file = create_temp_plaintext_file(
         "bank - username: user1, password: foo\nbank - username: user2, password: bar",
     );
 
-    run_sekrets_command(&["encrypt", "-f", plaintext_file.path().to_str().unwrap()])
+    let encrypted_path = plaintext_file.path().to_str().unwrap();
+
+    run_sekrets_command(&["encrypt", "-f", encrypted_path])
         .assert()
         .success();
 
-    run_sekrets_command(&["copy", "-d", temp_dir.path().to_str().unwrap()])
+    let destination_dir = temp_dir.path();
+    run_sekrets_command(&["copy", "-d", destination_dir.to_str().unwrap()])
         .assert()
         .success();
 
-    let secret_enc_path = temp_dir.path().join("sekrets.enc");
+    let secret_enc_path = destination_dir.join("sekrets.enc");
 
     expect_pred!(Path::new(&secret_enc_path).exists());
+
+    TestCleanup::clean();
 }
