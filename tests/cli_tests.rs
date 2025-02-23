@@ -46,11 +46,9 @@ impl TestCleanup {
         let tmp_folder = Self::root_path();
 
         if tmp_folder.exists() {
-            if fs::remove_dir_all(tmp_folder).is_ok() {
-                return;
-            }
+            fs::remove_dir_all(tmp_folder).expect("to be removed");
+            thread::sleep(Duration::from_millis(100))
         }
-        thread::sleep(Duration::from_millis(100))
     }
 }
 

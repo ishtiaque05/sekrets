@@ -197,7 +197,7 @@ fn generate_new_credentials(
 #[cfg(not(test))]
 pub fn prompt_user_password() -> String {
     if std::env::var("TEST_MODE").is_ok() {
-        return "foo".to_string();
+        "foo".to_string()
     } else {
         use rpassword::read_password;
         println!("Enter password: ");
