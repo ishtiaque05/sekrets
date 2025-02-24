@@ -1,4 +1,5 @@
 mod cli;
+mod credential_manager;
 mod credentials;
 mod decryptor;
 mod encryptor;

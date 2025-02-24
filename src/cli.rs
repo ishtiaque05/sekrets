@@ -1,11 +1,9 @@
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::{fs, path::Path};
 
 use clap::{Parser, Subcommand};
 
 use crate::{
+    credential_manager::CredentialManager,
     credentials::Credential,
     decryptor,
     encryptor::{self, ENCRYPTED_FILENAME},
@@ -176,25 +174,17 @@ fn handle_append(accounts: &[String], usernames: &[String]) -> Result<()> {
 
 fn handle_update(account: String, username: String) -> Result<()> {
     let password = prompt_user_password();
-    let encrypted_filepath = get_encrypted_file_path(ENCRYPTED_FILENAME);
+    let mut credential_manager = CredentialManager::new(password).expect("not to fail");
 
-    let decrypted_data = decryptor::decrypt_file(&encrypted_filepath.to_string_lossy(), &password)?;
+    println!(
+        "Enter new password for account: {}, username: {}",
+        account, username
+    );
+    let new_password = prompt_user_password();
 
-    let parser = CredentialParser::new(decrypted_data);
-
-    match parser.get_credentials(Some(username), account) {
-        Ok(credentials) => {
-            for cred in credentials {
-                println!(
-                    "Account: {} - Username: {}, Password: {}",
-                    cred.account, cred.username, cred.password
-                );
-            }
-        }
-        Err(e) => {
-            println!("{}", e);
-        }
-    }
+    credential_manager
+        .update_password(&account, &username, &new_password)
+        .expect("update password to succeed!");
 
     Ok(())
 }
