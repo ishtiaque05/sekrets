@@ -4,6 +4,7 @@ mod credentials;
 mod decryptor;
 mod encryptor;
 mod parser;
+mod password_generator;
 mod paths;
 mod types;
 

@@ -8,6 +8,7 @@ use crate::{
     decryptor,
     encryptor::{self, ENCRYPTED_FILENAME},
     parser::Parser as CredentialParser,
+    password_generator::{PasswordGenerationError, PasswordGenerator},
     paths::{self, get_encrypted_file_path},
 };
 use anyhow::{Context, Result};
@@ -64,6 +65,11 @@ enum Commands {
         #[arg(short, long = "username", required = true)]
         username: String,
     },
+
+    Generate {
+        #[arg(short = 'p', long = "password", default_value_t = false)]
+        generate_flag: bool,
+    },
 }
 
 pub fn run(cli: Cli) -> Result<()> {
@@ -81,6 +87,16 @@ pub fn run(cli: Cli) -> Result<()> {
             usernames,
         } => handle_append(&accounts, &usernames),
         Commands::Update { account, username } => handle_update(account, username),
+        Commands::Generate { generate_flag } => generate_strong_password(generate_flag),
+    }
+}
+
+fn generate_strong_password(flag: bool) -> Result<()> {
+    if flag {
+        PasswordGenerator::interactive_mode().map_err(anyhow::Error::from)?;
+        Ok(())
+    } else {
+        Err(PasswordGenerationError::NoChoiceSelected.into())
     }
 }
 
