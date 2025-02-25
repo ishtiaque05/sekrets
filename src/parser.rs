@@ -60,7 +60,6 @@ impl Parser {
             }
         }
 
-        // Borrow `username` here instead of consuming it
         match (credentials.is_empty(), &username) {
             (true, Some(username)) => Err(ParsingError::AccountWithUsernameNotFound(
                 account.clone(),
@@ -69,6 +68,36 @@ impl Parser {
             (true, None) => Err(ParsingError::AccountNotFound(account.clone())),
             _ => Ok(credentials),
         }
+    }
+
+    pub fn get_all_credentials(&self) -> Vec<Credential> {
+        let mut credentials = Vec::new();
+
+        for line in self.decrypted_data.lines() {
+            let line = line.trim();
+            if let Some((account, credentials_part)) = line.split_once(" - ") {
+                let mut username = String::new();
+                let mut password = String::new();
+
+                for pair in credentials_part.split(", ") {
+                    if let Some(value) = pair.strip_prefix("username:") {
+                        username = value.trim().to_string();
+                    } else if let Some(value) = pair.strip_prefix("password:") {
+                        password = value.trim().to_string();
+                    }
+                }
+
+                if !account.is_empty() && !username.is_empty() && !password.is_empty() {
+                    credentials.push(Credential {
+                        account: account.to_string(),
+                        username,
+                        password,
+                    });
+                }
+            }
+        }
+
+        credentials
     }
 }
 

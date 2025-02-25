@@ -3,6 +3,7 @@ use std::{fs, path::Path};
 use clap::{Parser, Subcommand};
 
 use crate::{
+    credential_manager::CredentialManager,
     credentials::Credential,
     decryptor,
     encryptor::{self, ENCRYPTED_FILENAME},
@@ -56,6 +57,13 @@ enum Commands {
         #[arg(short, long = "username", required = true)]
         usernames: Vec<String>,
     },
+
+    Update {
+        #[arg(short, long = "account", required = true)]
+        account: String,
+        #[arg(short, long = "username", required = true)]
+        username: String,
+    },
 }
 
 pub fn run(cli: Cli) -> Result<()> {
@@ -72,6 +80,7 @@ pub fn run(cli: Cli) -> Result<()> {
             accounts,
             usernames,
         } => handle_append(&accounts, &usernames),
+        Commands::Update { account, username } => handle_update(account, username),
     }
 }
 
@@ -86,44 +95,40 @@ fn handle_encrypt(file: &str) -> Result<()> {
 }
 
 fn handle_decrypt(accounts: &[String], usernames: &[String]) -> Result<()> {
-    let password = prompt_user_password();
-    let encrypted_filepath = get_encrypted_file_path(ENCRYPTED_FILENAME);
-
     if usernames.is_empty() {
-        let decrypted_data =
-            decryptor::decrypt_file(&encrypted_filepath.to_string_lossy(), &password)?;
-        let parser = CredentialParser::new(decrypted_data);
-
-        for account in accounts {
-            let credentials = parser.get_credentials(None, account.to_string())?;
-            for cred in credentials {
-                println!(
-                    "Account: {} - Username: {}, Password: {}",
-                    cred.account, cred.username, cred.password
-                );
-            }
-        }
+        let unames = vec![None; accounts.len()];
+        print_credentials(accounts, unames).expect("to print credentails");
     } else {
         if accounts.len() != usernames.len() {
             return Err(anyhow::anyhow!("Mismatched accounts and usernames"));
         }
-        let decrypted_data =
-            decryptor::decrypt_file(&encrypted_filepath.to_string_lossy(), &password)?;
-        let parser = CredentialParser::new(decrypted_data);
 
-        for (account, username) in accounts.iter().zip(usernames.iter()) {
-            match parser.get_credentials(Some(username.to_string()), account.to_string()) {
-                Ok(credentials) => {
-                    for cred in credentials {
-                        println!(
-                            "Account: {} - Username: {}, Password: {}",
-                            cred.account, cred.username, cred.password
-                        );
-                    }
+        let some_usernames = usernames.iter().map(|s| Some(s.clone())).collect();
+        print_credentials(accounts, some_usernames).expect("to print credentails");
+    }
+
+    Ok(())
+}
+
+fn print_credentials(accounts: &[String], usernames: Vec<Option<String>>) -> Result<()> {
+    let password = prompt_user_password();
+    let encrypted_filepath = get_encrypted_file_path(ENCRYPTED_FILENAME);
+
+    let decrypted_data = decryptor::decrypt_file(&encrypted_filepath.to_string_lossy(), &password)?;
+    let parser = CredentialParser::new(decrypted_data);
+
+    for (account, username) in accounts.iter().zip(usernames.iter()) {
+        match parser.get_credentials(username.clone(), account.to_string()) {
+            Ok(credentials) => {
+                for cred in credentials {
+                    println!(
+                        "Account: {} - Username: {}, Password: {}",
+                        cred.account, cred.username, cred.password
+                    );
                 }
-                Err(e) => {
-                    println!("{}", e);
-                }
+            }
+            Err(e) => {
+                println!("{}", e);
             }
         }
     }
@@ -163,6 +168,23 @@ fn handle_append(accounts: &[String], usernames: &[String]) -> Result<()> {
 
     encryptor::encrypt_text(&new_data, &master_pass)?;
     println!("✅ Credentials successfully added!");
+
+    Ok(())
+}
+
+fn handle_update(account: String, username: String) -> Result<()> {
+    let password = prompt_user_password();
+    let mut credential_manager = CredentialManager::new(password)?;
+
+    println!(
+        "Enter new password for account: {}, username: {}",
+        account, username
+    );
+    let new_password = prompt_user_password();
+
+    credential_manager
+        .update_password(&account, &username, &new_password)
+        .expect("update password to succeed!");
 
     Ok(())
 }
