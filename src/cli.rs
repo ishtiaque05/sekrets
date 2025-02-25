@@ -174,7 +174,7 @@ fn handle_append(accounts: &[String], usernames: &[String]) -> Result<()> {
 
 fn handle_update(account: String, username: String) -> Result<()> {
     let password = prompt_user_password();
-    let mut credential_manager = CredentialManager::new(password).expect("not to fail");
+    let mut credential_manager = CredentialManager::new(password)?;
 
     println!(
         "Enter new password for account: {}, username: {}",

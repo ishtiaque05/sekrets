@@ -4,20 +4,20 @@ use crate::{
 };
 
 pub struct CredentialManager {
-    password: String,
+    master_password: String,
     credentials: Vec<Credential>,
 }
 
 impl CredentialManager {
-    pub fn new(password: String) -> Result<Self, FileError> {
+    pub fn new(master_password: String) -> Result<Self, FileError> {
         let encrypted_filepath = get_encrypted_file_path(crate::encryptor::ENCRYPTED_FILENAME)
             .to_string_lossy()
             .to_string();
-        let decrypted_data = decryptor::decrypt_file(&encrypted_filepath, &password)?;
+        let decrypted_data = decryptor::decrypt_file(&encrypted_filepath, &master_password)?;
         let parser = CredentialParser::new(decrypted_data);
 
         Ok(Self {
-            password,
+            master_password,
             credentials: parser.get_all_credentials(),
         })
     }
@@ -29,25 +29,18 @@ impl CredentialManager {
         username: &str,
         new_password: &str,
     ) -> Result<(), FileError> {
-        let mut found = false;
 
-        for cred in &mut self.credentials {
-            if cred.account == account && cred.username == username {
-                cred.password = new_password.to_string();
-                found = true;
-            }
-        }
-
-        if !found {
+        if let Some(cred) = self.credentials.iter_mut().find(|c| c.account == account && c.username == username) {
+            cred.password = new_password.to_string();
+            self.save_credentials()?; 
+            println!("✅ Password updated successfully!");
+        } else {
             println!(
                 "⚠️ No credentials found for account: {} and username: {}",
                 account, username
             );
-            return Ok(());
         }
-
-        self.save_credentials()?;
-        println!("✅ Password updated successfully!");
+    
         Ok(())
     }
 
@@ -59,7 +52,7 @@ impl CredentialManager {
             .map(|c| c.format_as_str())
             .collect::<Vec<_>>()
             .join("\n");
-        let _ = encryptor::encrypt_text(&updated_data, &self.password);
+        let _ = encryptor::encrypt_text(&updated_data, &self.master_password);
         Ok(())
     }
 }

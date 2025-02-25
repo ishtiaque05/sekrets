@@ -6,11 +6,11 @@ use std::io::Write;
 use tempfile::TempDir;
 
 use crate::{
-    cli::{prompt_user_password, run, Cli, Commands},
+    cli::{handle_update, prompt_user_password, run, Cli, Commands},
     decryptor,
     encryptor::{encrypt_file, ENCRYPTED_FILENAME},
     paths::get_encrypted_file_path,
-    tests::helpers::create_temp_plaintext_file,
+    tests::helpers::create_temp_plaintext_file, types::FileError,
 };
 
 #[googletest::test]
@@ -73,6 +73,40 @@ fn test_cli_decrypt_parsing_with_username() {
             accounts: vec!["github".to_string(), "bank".to_string()],
             usernames: vec!["foo".to_string(), "bar".to_string()]
         })
+    );
+}
+
+#[googletest::test]
+fn test_cli_update_creds() {
+    expect_that!(
+        Cli::parse_from(vec![
+            "sekrets",
+            "update",
+            "--account",
+            "github",
+            "-u",
+            "foo"
+        ])
+        .command,
+        eq(&Commands::Update{
+            account: "github".to_string(),
+            username: "foo".to_string()
+        })
+    );
+}
+
+#[googletest::test]
+fn test_cli_update_failure() {
+    let res = Cli::try_parse_from(vec![
+        "sekrets",
+        "update",
+        "--account",
+        "github"
+    ]);
+
+    expect_that!(
+        res.unwrap_err().to_string(), 
+        contains_substring("the following required arguments were not provided:\n  --username <USERNAME>")
     );
 }
 
@@ -273,4 +307,65 @@ fn test_run_append_no_encrypted_file() {
     );
 
     env::remove_var("TEST_MODE");
+}
+
+#[googletest::test]
+fn test_handle_update() {
+    env::set_var("TEST_MODE", "1");
+
+    let file_path = create_temp_plaintext_file("github - username: git, password: change_me");
+    let pass = prompt_user_password();
+    let _ =
+        encrypt_file(file_path.path().to_str().unwrap(), &pass).expect("Failed to encrypt file");
+
+    let _= handle_update("github".to_string(), "git".to_string());
+
+
+    let decrypted_data = decryptor::decrypt_file(
+        &get_encrypted_file_path(ENCRYPTED_FILENAME).to_string_lossy(),
+        &pass,
+    )
+    .expect("Failed to decrypt file");
+
+    expect_that!(
+        decrypted_data,
+        contains_substring("github - username: git, password: foo")
+    );
+
+}
+
+#[googletest::test]
+fn test_handle_update_username_not_found() {
+    env::set_var("TEST_MODE", "1");
+
+    let file_path = create_temp_plaintext_file("github - username: me, password: change_me");
+    let pass = prompt_user_password();
+    let _ =
+        encrypt_file(file_path.path().to_str().unwrap(), &pass).expect("Failed to encrypt file");
+
+    let _= handle_update("github".to_string(), "unknown".to_string());
+
+
+    let decrypted_data = decryptor::decrypt_file(
+        &get_encrypted_file_path(ENCRYPTED_FILENAME).to_string_lossy(),
+        &pass,
+    )
+    .expect("Failed to decrypt file");
+
+    expect_that!(
+        decrypted_data,
+        contains_substring("github - username: me, password: change_me")
+    );
+}
+
+#[googletest::test]
+fn test_handle_update_failure() {
+    env::set_var("TEST_MODE", "1");
+    
+    let res = handle_update("github".to_string(), "unknown".to_string());
+
+    expect_that!(
+        res.unwrap_err().to_string(),
+        contains_substring("Failed to read to file: No such file or directory")
+    );
 }
