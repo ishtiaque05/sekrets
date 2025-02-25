@@ -29,10 +29,13 @@ impl CredentialManager {
         username: &str,
         new_password: &str,
     ) -> Result<(), FileError> {
-
-        if let Some(cred) = self.credentials.iter_mut().find(|c| c.account == account && c.username == username) {
+        if let Some(cred) = self
+            .credentials
+            .iter_mut()
+            .find(|c| c.account == account && c.username == username)
+        {
             cred.password = new_password.to_string();
-            self.save_credentials()?; 
+            self.save_credentials()?;
             println!("✅ Password updated successfully!");
         } else {
             println!(
@@ -40,7 +43,7 @@ impl CredentialManager {
                 account, username
             );
         }
-    
+
         Ok(())
     }
 

@@ -10,7 +10,7 @@ use crate::{
     decryptor,
     encryptor::{encrypt_file, ENCRYPTED_FILENAME},
     paths::get_encrypted_file_path,
-    tests::helpers::create_temp_plaintext_file, types::FileError,
+    tests::helpers::create_temp_plaintext_file,
 };
 
 #[googletest::test]
@@ -88,7 +88,7 @@ fn test_cli_update_creds() {
             "foo"
         ])
         .command,
-        eq(&Commands::Update{
+        eq(&Commands::Update {
             account: "github".to_string(),
             username: "foo".to_string()
         })
@@ -97,16 +97,13 @@ fn test_cli_update_creds() {
 
 #[googletest::test]
 fn test_cli_update_failure() {
-    let res = Cli::try_parse_from(vec![
-        "sekrets",
-        "update",
-        "--account",
-        "github"
-    ]);
+    let res = Cli::try_parse_from(vec!["sekrets", "update", "--account", "github"]);
 
     expect_that!(
-        res.unwrap_err().to_string(), 
-        contains_substring("the following required arguments were not provided:\n  --username <USERNAME>")
+        res.unwrap_err().to_string(),
+        contains_substring(
+            "the following required arguments were not provided:\n  --username <USERNAME>"
+        )
     );
 }
 
@@ -318,8 +315,7 @@ fn test_handle_update() {
     let _ =
         encrypt_file(file_path.path().to_str().unwrap(), &pass).expect("Failed to encrypt file");
 
-    let _= handle_update("github".to_string(), "git".to_string());
-
+    let _ = handle_update("github".to_string(), "git".to_string());
 
     let decrypted_data = decryptor::decrypt_file(
         &get_encrypted_file_path(ENCRYPTED_FILENAME).to_string_lossy(),
@@ -331,7 +327,6 @@ fn test_handle_update() {
         decrypted_data,
         contains_substring("github - username: git, password: foo")
     );
-
 }
 
 #[googletest::test]
@@ -343,8 +338,7 @@ fn test_handle_update_username_not_found() {
     let _ =
         encrypt_file(file_path.path().to_str().unwrap(), &pass).expect("Failed to encrypt file");
 
-    let _= handle_update("github".to_string(), "unknown".to_string());
-
+    let _ = handle_update("github".to_string(), "unknown".to_string());
 
     let decrypted_data = decryptor::decrypt_file(
         &get_encrypted_file_path(ENCRYPTED_FILENAME).to_string_lossy(),
@@ -361,7 +355,7 @@ fn test_handle_update_username_not_found() {
 #[googletest::test]
 fn test_handle_update_failure() {
     env::set_var("TEST_MODE", "1");
-    
+
     let res = handle_update("github".to_string(), "unknown".to_string());
 
     expect_that!(
