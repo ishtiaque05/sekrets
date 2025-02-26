@@ -1,9 +1,15 @@
-use std::{collections::HashMap, fs, path::Path};
+use std::{fs, path::Path};
 
 use clap::{Parser, Subcommand};
 
 use crate::{
-    credential_file_parser::{CredentialFileParser, CredentialHashMap}, credential_manager::CredentialManager, credentials::Credential, decryptor, encryptor::{self, ENCRYPTED_FILENAME}, password_generator::{prompt_user_password, PasswordGenerationError, PasswordGenerator}, paths::{self, get_encrypted_file_path}
+    credential_file_parser::{CredentialFileParser, CredentialHashMap},
+    credential_manager::CredentialManager,
+    credentials::Credential,
+    decryptor,
+    encryptor::{self, ENCRYPTED_FILENAME},
+    password_generator::{prompt_user_password, PasswordGenerationError, PasswordGenerator},
+    paths::{self, get_encrypted_file_path},
 };
 use anyhow::{Context, Result};
 
@@ -173,7 +179,7 @@ fn handle_append(accounts: &[String], usernames: &[String]) -> Result<()> {
     }
 
     let mut credential_manager = CredentialManager::new(master_pass.clone())?;
-    
+
     for (account, username) in accounts.iter().zip(usernames.iter()) {
         let key = (account.clone(), username.clone());
 
@@ -195,23 +201,25 @@ fn handle_append(accounts: &[String], usernames: &[String]) -> Result<()> {
                 );
 
                 let new_pass = PasswordGenerator::interactive_mode().expect("new password");
-               
+
                 existing_cred.update_pass(new_pass);
 
                 println!("✅ Password updated successfully!");
             } else {
-               println!("Password update skipped for account {}, username: {}", account, username)
-                
+                println!(
+                    "Password update skipped for account {}, username: {}",
+                    account, username
+                )
             }
         } else {
             add_new_creds(account, username, &mut credential_manager.credentials);
         }
     }
-    
-    credential_manager.save_credentials()?; 
+
+    credential_manager.save_credentials()?;
 
     println!("✅ Changes successfully saved!");
-   
+
     Ok(())
 }
 
@@ -222,22 +230,24 @@ fn add_new_creds(account: &str, username: &str, new_credentials: &mut Credential
     );
     let password = PasswordGenerator::interactive_mode().expect("interactive pass not to fail");
 
-    new_credentials.insert((account.to_string(), username.to_string()), Credential::new(account.to_string(), username.to_string(), password));
+    new_credentials.insert(
+        (account.to_string(), username.to_string()),
+        Credential::new(account.to_string(), username.to_string(), password),
+    );
 }
 
 fn handle_update(account: String, username: String) -> Result<()> {
     let password = prompt_user_password();
     let mut credential_manager = CredentialManager::new(password)?;
 
-   
     if let Some(cred) = credential_manager.find_creds(&account, &username) {
         println!(
             "Enter new password for account: {}, username: {}",
             account, username
         );
 
-        let new_password = prompt_user_password();
-    
+        let new_password = PasswordGenerator::interactive_mode()?;
+
         cred.update_pass(new_password);
     }
 
@@ -246,7 +256,6 @@ fn handle_update(account: String, username: String) -> Result<()> {
 
     Ok(())
 }
-
 
 #[cfg(test)]
 mod tests;

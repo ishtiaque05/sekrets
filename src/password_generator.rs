@@ -60,9 +60,8 @@ impl PasswordGenerator {
 
     pub fn generate_from_charset(&self, charset: &[char]) -> String {
         let mut rng = rand::thread_rng();
-        let password: String;
 
-        password = (0..self.length.unwrap_or(DEFAULT_PASSWORD_LENGTH))
+        let password = (0..self.length.unwrap_or(DEFAULT_PASSWORD_LENGTH))
             .map(|_| *charset.choose(&mut rng).unwrap())
             .collect();
 

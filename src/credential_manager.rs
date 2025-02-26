@@ -1,5 +1,9 @@
 use crate::{
-    credential_file_parser::{CredentialFileParser, CredentialHashMap}, credentials::Credential, decryptor, encryptor, paths::get_encrypted_file_path, types::FileError
+    credential_file_parser::{CredentialFileParser, CredentialHashMap},
+    credentials::Credential,
+    decryptor, encryptor,
+    paths::get_encrypted_file_path,
+    types::FileError,
 };
 
 pub struct CredentialManager {
@@ -22,7 +26,8 @@ impl CredentialManager {
     }
 
     pub fn find_creds(&mut self, account: &str, username: &str) -> Option<&mut Credential> {
-        self.credentials.get_mut(&(account.to_string(), username.to_string()))
+        self.credentials
+            .get_mut(&(account.to_string(), username.to_string()))
     }
 
     pub fn save_credentials(&self) -> Result<(), FileError> {
@@ -33,7 +38,7 @@ impl CredentialManager {
             .collect::<Vec<_>>()
             .join("\n");
         let _ = encryptor::encrypt_text(&updated_data, &self.master_password);
-        
+
         Ok(())
     }
 }
