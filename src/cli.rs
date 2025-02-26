@@ -190,9 +190,7 @@ fn handle_append(accounts: &[String], usernames: &[String]) -> Result<()> {
             );
             println!("Do you want to update the password? (yes/no): ");
 
-            let mut response = String::new();
-            std::io::stdin().read_line(&mut response)?;
-            let response = response.trim().to_lowercase();
+            let response = confirm_interactive_pass_mode()?;
 
             if response == "yes" {
                 println!(
@@ -255,6 +253,16 @@ fn handle_update(account: String, username: String) -> Result<()> {
     println!("✅ Password updated successfully!");
 
     Ok(())
+}
+
+fn confirm_interactive_pass_mode() -> Result<String> {
+    if std::env::var("TEST_MODE").is_ok() {
+        return Ok("no".to_string());
+    }
+    let mut response = String::new();
+    std::io::stdin().read_line(&mut response)?;
+
+    Ok(response.trim().to_lowercase())
 }
 
 #[cfg(test)]

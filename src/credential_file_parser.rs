@@ -5,6 +5,7 @@ use crate::credentials::Credential;
 pub type CredentialHashMap = HashMap<(String, String), Credential>;
 
 #[derive(Debug, thiserror::Error)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 pub enum ParsingError {
     #[error("No credentials found for account: `{0}'")]
     AccountNotFound(String),

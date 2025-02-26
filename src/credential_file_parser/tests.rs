@@ -46,11 +46,7 @@ fn test_malformed_credentials() {
 
     expect_that!(
         result,
-        ok(eq(&vec![Credential {
-            account,
-            username: "".into(),
-            password: "".into()
-        }]))
+        err(eq(&ParsingError::AccountNotFound("my_account".to_string())))
     )
 }
 

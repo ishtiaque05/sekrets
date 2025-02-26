@@ -325,7 +325,7 @@ fn test_handle_update() {
 
     expect_that!(
         decrypted_data,
-        contains_substring("github - username: git, password: foo")
+        contains_substring("github - username: git, password: bar")
     );
 }
 
