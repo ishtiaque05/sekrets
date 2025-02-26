@@ -23,56 +23,28 @@ impl CredentialFileParser {
         Self { decrypted_data }
     }
 
-    // TODO: refactor this to use get_all_credentials
     pub fn get_credentials(
         &self,
         username: Option<String>,
         account: String,
     ) -> Result<Vec<Credential>, ParsingError> {
-        let mut credentials = Vec::new();
+        let credentials_map = self.get_all_credentials();
+        let mut matching_credentials = Vec::new();
 
-        for line in self.decrypted_data.lines() {
-            let line = line.trim();
-
-            let prefix = format!("{} - ", account);
-            if line.starts_with(&prefix) {
-                let parts: Vec<&str> = line.splitn(2, " - ").collect();
-                if parts.len() != 2 {
-                    continue;
-                }
-
-                let credentials_part = parts[1];
-
-                let mut matched_username = String::new();
-                let mut password = String::new();
-
-                for pair in credentials_part.split(", ") {
-                    if let Some(value) = pair.strip_prefix("username:") {
-                        matched_username = value.trim().to_string();
-                    } else if let Some(value) = pair.strip_prefix("password:") {
-                        password = value.trim().to_string();
-                    }
-                }
-
-                // Only push if there's no username provided or it matches
-                if username.as_ref().map_or(true, |u| u == &matched_username) {
-                    credentials.push(Credential {
-                        account: account.clone(),
-                        username: matched_username.clone(), // Keep the found username
-                        password,
-                    });
-                }
+        for ((acct, uname), credential) in credentials_map.into_iter() {
+            if acct == account && (username.is_none() || username == Some(uname)) {
+                matching_credentials.push(credential);
             }
         }
 
-        match (credentials.is_empty(), &username) {
-            (true, Some(username)) => Err(ParsingError::AccountWithUsernameNotFound(
-                account.clone(),
-                username.clone(),
-            )),
-            (true, None) => Err(ParsingError::AccountNotFound(account.clone())),
-            _ => Ok(credentials),
+        if matching_credentials.is_empty() {
+            return match username {
+                Some(u) => Err(ParsingError::AccountWithUsernameNotFound(account, u)),
+                None => Err(ParsingError::AccountNotFound(account)),
+            };
         }
+
+        Ok(matching_credentials)
     }
 
     pub fn get_all_credentials(&self) -> CredentialHashMap {
