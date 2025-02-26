@@ -1,7 +1,7 @@
 use std::vec;
 
 use super::*;
-use crate::parser::ParsingError::AccountWithUsernameNotFound;
+use crate::credential_file_parser::ParsingError::AccountWithUsernameNotFound;
 use googletest::prelude::*;
 
 #[googletest::test]
@@ -9,7 +9,7 @@ fn test_successful_credential_parsing() {
     let account = "my_account".to_string();
     let data = "my_account - username: user123, password: pass456\nanother_account - username: other, password: secret";
 
-    let credential = Parser::new(data.into());
+    let credential = CredentialFileParser::new(data.into());
     let result = credential.get_credentials(None, account.clone());
 
     expect_that!(
@@ -27,7 +27,7 @@ fn test_account_not_found() {
     let account = "unknown_account".to_string();
     let data = "my_account - username: user123, password: pass456";
 
-    let credential = Parser::new(data.to_string());
+    let credential = CredentialFileParser::new(data.to_string());
     let result = credential.get_credentials(None, account);
 
     expect_that!(
@@ -41,7 +41,7 @@ fn test_malformed_credentials() {
     let account = "my_account".to_string();
     let data = "my_account - username user123, password pass456".to_string();
 
-    let credential = Parser::new(data);
+    let credential = CredentialFileParser::new(data);
     let result = credential.get_credentials(None, account.clone());
 
     expect_that!(
@@ -62,7 +62,7 @@ fn test_multiple_accounts() {
                 account3 - username: user3, password: pass3"
         .to_string();
 
-    let parser = Parser::new(data);
+    let parser = CredentialFileParser::new(data);
     let result = parser.get_credentials(None, account.clone());
 
     expect_pred!(result.is_ok());
@@ -94,7 +94,7 @@ fn test_username_account_match() {
                 account3 - username: user3, password: pass3"
         .to_string();
 
-    let parser = Parser::new(data);
+    let parser = CredentialFileParser::new(data);
     let result = parser.get_credentials(Some("user2".to_string()), account.clone());
 
     expect_pred!(result.is_ok());
@@ -120,7 +120,7 @@ fn test_username_doesnot_match() {
                 account3 - username: user3, password: pass3"
         .to_string();
 
-    let parser = Parser::new(data);
+    let parser = CredentialFileParser::new(data);
     let result = parser.get_credentials(Some("foo".to_string()), account.clone());
 
     expect_that!(

@@ -3,13 +3,7 @@ use std::{fs, path::Path};
 use clap::{Parser, Subcommand};
 
 use crate::{
-    credential_manager::CredentialManager,
-    credentials::Credential,
-    decryptor,
-    encryptor::{self, ENCRYPTED_FILENAME},
-    parser::Parser as CredentialParser,
-    password_generator::{PasswordGenerationError, PasswordGenerator},
-    paths::{self, get_encrypted_file_path},
+    credential_file_parser::CredentialFileParser, credential_manager::CredentialManager, credentials::Credential, decryptor, encryptor::{self, ENCRYPTED_FILENAME}, password_generator::{prompt_user_password, PasswordGenerationError, PasswordGenerator}, paths::{self, get_encrypted_file_path}
 };
 use anyhow::{Context, Result};
 
@@ -131,7 +125,7 @@ fn print_credentials(accounts: &[String], usernames: Vec<Option<String>>) -> Res
     let encrypted_filepath = get_encrypted_file_path(ENCRYPTED_FILENAME);
 
     let decrypted_data = decryptor::decrypt_file(&encrypted_filepath.to_string_lossy(), &password)?;
-    let parser = CredentialParser::new(decrypted_data);
+    let parser = CredentialFileParser::new(decrypted_data);
 
     for (account, username) in accounts.iter().zip(usernames.iter()) {
         match parser.get_credentials(username.clone(), account.to_string()) {
@@ -221,7 +215,9 @@ fn generate_new_credentials(
                 account, username
             );
 
-            Credential::new(account.clone(), username.clone(), prompt_user_password())
+            let pass = PasswordGenerator::interactive_mode().expect("interactive pass not to fail");
+
+            Credential::new(account.clone(), username.clone(), pass)
         })
         .collect();
 
@@ -230,22 +226,6 @@ fn generate_new_credentials(
     }
 
     Ok(new_data)
-}
-
-#[cfg(not(test))]
-pub fn prompt_user_password() -> String {
-    if std::env::var("TEST_MODE").is_ok() {
-        "foo".to_string()
-    } else {
-        use rpassword::read_password;
-        println!("Enter password: ");
-        read_password().expect("Failed to read password")
-    }
-}
-
-#[cfg(test)]
-pub fn prompt_user_password() -> String {
-    "foo".to_string()
 }
 
 #[cfg(test)]

@@ -3,7 +3,7 @@ mod credential_manager;
 mod credentials;
 mod decryptor;
 mod encryptor;
-mod parser;
+mod credential_file_parser;
 mod password_generator;
 mod paths;
 mod types;

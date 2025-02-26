@@ -1,6 +1,5 @@
 use crate::{
-    credentials::Credential, decryptor, encryptor, parser::Parser as CredentialParser,
-    paths::get_encrypted_file_path, types::FileError,
+    credential_file_parser::CredentialFileParser, credentials::Credential, decryptor, encryptor, paths::get_encrypted_file_path, types::FileError
 };
 
 pub struct CredentialManager {
@@ -14,7 +13,7 @@ impl CredentialManager {
             .to_string_lossy()
             .to_string();
         let decrypted_data = decryptor::decrypt_file(&encrypted_filepath, &master_password)?;
-        let parser = CredentialParser::new(decrypted_data);
+        let parser = CredentialFileParser::new(decrypted_data);
 
         Ok(Self {
             master_password,

@@ -10,11 +10,11 @@ pub enum ParsingError {
 }
 
 #[derive(Debug, Default)]
-pub struct Parser {
+pub struct CredentialFileParser {
     pub decrypted_data: String,
 }
 
-impl Parser {
+impl CredentialFileParser {
     pub fn new(decrypted_data: String) -> Self {
         Self { decrypted_data }
     }
