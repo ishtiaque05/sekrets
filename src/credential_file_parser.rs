@@ -28,20 +28,29 @@ impl CredentialFileParser {
         username: Option<String>,
         account: String,
     ) -> Result<Vec<Credential>, ParsingError> {
-        let credentials_map = self.get_all_credentials();
-        let mut matching_credentials = Vec::new();
+        let credentials_map = self.get_all_credentials(); // Get all credentials as HashMap
 
-        for ((acct, uname), credential) in credentials_map.into_iter() {
-            if acct == account && (username.is_none() || username == Some(uname)) {
-                matching_credentials.push(credential);
+        if let Some(ref uname) = username {
+            if let Some(credential) = credentials_map.get(&(account.clone(), uname.clone())) {
+                return Ok(vec![credential.clone()]); 
+            } else {
+                return Err(ParsingError::AccountWithUsernameNotFound(account, uname.clone()));
             }
         }
 
+        let matching_credentials: Vec<Credential> = credentials_map
+            .into_iter()
+            .filter_map(|((acct, _), credential)| {
+                if acct == account {
+                    Some(credential) 
+                } else {
+                    None
+                }
+            })
+            .collect();
+
         if matching_credentials.is_empty() {
-            return match username {
-                Some(u) => Err(ParsingError::AccountWithUsernameNotFound(account, u)),
-                None => Err(ParsingError::AccountNotFound(account)),
-            };
+            return Err(ParsingError::AccountNotFound(account));
         }
 
         Ok(matching_credentials)
