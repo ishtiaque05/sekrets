@@ -14,6 +14,10 @@ impl Credential {
         }
     }
 
+    pub fn update_pass(&mut self, new_pass: String) {
+        self.password = new_pass
+    }
+
     pub fn format_as_str(&self) -> String {
         format!(
             "{} - username: {}, password: {}",

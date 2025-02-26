@@ -1,4 +1,8 @@
+use std::collections::HashMap;
+
 use crate::credentials::Credential;
+
+pub type CredentialHashMap = HashMap<(String, String), Credential>;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ParsingError {
@@ -19,6 +23,7 @@ impl CredentialFileParser {
         Self { decrypted_data }
     }
 
+    // TODO: refactor this to use get_all_credentials
     pub fn get_credentials(
         &self,
         username: Option<String>,
@@ -70,8 +75,8 @@ impl CredentialFileParser {
         }
     }
 
-    pub fn get_all_credentials(&self) -> Vec<Credential> {
-        let mut credentials = Vec::new();
+    pub fn get_all_credentials(&self) -> CredentialHashMap {
+        let mut credentials_map: CredentialHashMap = HashMap::new();
 
         for line in self.decrypted_data.lines() {
             let line = line.trim();
@@ -88,16 +93,15 @@ impl CredentialFileParser {
                 }
 
                 if !account.is_empty() && !username.is_empty() && !password.is_empty() {
-                    credentials.push(Credential {
-                        account: account.to_string(),
-                        username,
-                        password,
-                    });
+                    credentials_map.insert(
+                        (account.to_string(), username.to_string()),
+                        Credential { account: account.to_string(), username, password },
+                    );
                 }
             }
         }
 
-        credentials
+        credentials_map
     }
 }
 
