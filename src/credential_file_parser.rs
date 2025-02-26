@@ -32,9 +32,12 @@ impl CredentialFileParser {
 
         if let Some(ref uname) = username {
             if let Some(credential) = credentials_map.get(&(account.clone(), uname.clone())) {
-                return Ok(vec![credential.clone()]); 
+                return Ok(vec![credential.clone()]);
             } else {
-                return Err(ParsingError::AccountWithUsernameNotFound(account, uname.clone()));
+                return Err(ParsingError::AccountWithUsernameNotFound(
+                    account,
+                    uname.clone(),
+                ));
             }
         }
 
@@ -42,7 +45,7 @@ impl CredentialFileParser {
             .into_iter()
             .filter_map(|((acct, _), credential)| {
                 if acct == account {
-                    Some(credential) 
+                    Some(credential)
                 } else {
                     None
                 }
