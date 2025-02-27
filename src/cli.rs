@@ -256,6 +256,7 @@ fn handle_update(account: String, username: String) -> Result<()> {
 }
 
 fn confirm_interactive_pass_mode() -> Result<String> {
+    // For testing purpose
     if std::env::var("TEST_PASSWORD_INTERACTIVE").is_ok() {
         Ok(std::env::var("TEST_PASSWORD_INTERACTIVE").unwrap())
     } else {

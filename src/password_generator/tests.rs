@@ -1,7 +1,6 @@
-use std::env;
-
 use super::*;
 use googletest::prelude::*;
+use temp_env::with_vars;
 
 #[googletest::test]
 fn test_generate_random() {
@@ -54,43 +53,48 @@ fn test_is_password_strong() {
 
 #[googletest::test]
 fn test_interactive_mode_in_test_mode() {
-    env::remove_var("TEST_MODE");
-    env::set_var("PASSWORD_GENERATOR_CHOICE", "4");
-    env::set_var("USER_TEST_PASS", "A^u4IfqU#PRla8+e");
-
-    let result = PasswordGenerator::interactive_mode();
-    expect_that!(result.unwrap(), eq(&"A^u4IfqU#PRla8+e".to_string()));
-
-    env::remove_var("PASSWORD_GENERATOR_CHOICE");
-    env::remove_var("USER_TEST_PASS");
+    with_vars(
+        vec![
+            ("PASSWORD_GENERATOR_CHOICE", Some("4")),
+            ("USER_TEST_PASS", Some("A^u4IfqU#PRla8+e")),
+        ],
+        || {
+            let result = PasswordGenerator::interactive_mode();
+            expect_that!(result.unwrap(), eq(&"A^u4IfqU#PRla8+e".to_string()));
+        },
+    );
 }
 
 #[googletest::test]
 fn test_interactive_mode_weak_pass_opt_4() {
-    env::set_var("PASSWORD_GENERATOR_CHOICE", "4");
-    env::set_var("USER_TEST_PASS", "foo");
-
-    let result = PasswordGenerator::interactive_mode();
-    expect_that!(
-        result,
-        err(matches_pattern!(PasswordGenerationError::IsWeak))
+    with_vars(
+        vec![
+            ("PASSWORD_GENERATOR_CHOICE", Some("4")),
+            ("USER_TEST_PASS", Some("foo")),
+        ],
+        || {
+            let result = PasswordGenerator::interactive_mode();
+            expect_that!(
+                result,
+                err(matches_pattern!(PasswordGenerationError::IsWeak))
+            );
+        },
     );
-
-    env::remove_var("PASSWORD_GENERATOR_CHOICE");
-    env::remove_var("USER_TEST_PASS");
 }
 
 #[googletest::test]
 fn test_interactive_mode_weak_invalid_opt() {
-    env::set_var("PASSWORD_GENERATOR_CHOICE", "5");
-    env::set_var("USER_TEST_PASS", "foo");
-
-    let result = PasswordGenerator::interactive_mode();
-    expect_that!(
-        result,
-        err(matches_pattern!(PasswordGenerationError::NoChoiceSelected))
+    with_vars(
+        vec![
+            ("PASSWORD_GENERATOR_CHOICE", Some("5")),
+            ("USER_TEST_PASS", Some("foo")),
+        ],
+        || {
+            let result = PasswordGenerator::interactive_mode();
+            expect_that!(
+                result,
+                err(matches_pattern!(PasswordGenerationError::NoChoiceSelected))
+            );
+        },
     );
-
-    env::remove_var("PASSWORD_GENERATOR_CHOICE");
-    env::remove_var("USER_TEST_PASS");
 }
