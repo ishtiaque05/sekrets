@@ -42,3 +42,6 @@ impl CredentialManager {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests;

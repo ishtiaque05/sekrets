@@ -252,9 +252,8 @@ fn test_run_append_command() {
     env::set_var("TEST_MODE", "1");
 
     let file_path = create_temp_plaintext_file("github - username: foo, password: bar");
-    let pass = prompt_user_password();
     let _ =
-        encrypt_file(file_path.path().to_str().unwrap(), &pass).expect("Failed to encrypt file");
+        encrypt_file(file_path.path().to_str().unwrap(), "foo").expect("Failed to encrypt file");
 
     expect_pred!(run(Cli::parse_from(vec![
         "sekrets",
@@ -268,7 +267,7 @@ fn test_run_append_command() {
 
     let decrypted_data = decryptor::decrypt_file(
         &get_encrypted_file_path(ENCRYPTED_FILENAME).to_string_lossy(),
-        &pass,
+        "foo",
     )
     .expect("Failed to decrypt file");
 
@@ -455,30 +454,11 @@ fn test_handle_append_success_existing_acc_pass_update() {
     env::remove_var("TEST_MODE");
 }
 
-// #[googletest::test]
-// fn test_handle_append_success_existing_acc_no_pass_update() {
-//     env::set_var("TEST_PASSWORD_INTERACTIVE", "no");
-//     env::set_var("TEST_MODE", "1");
-
-//     let file_path = create_temp_plaintext_file("bank - username: foo, password: willbechanged");
-
-//     let pass = prompt_user_password();
-//     encrypt_file(file_path.path().to_str().unwrap(), &pass).expect("Failed to encrypt file");
-
-//     let _= handle_append(&vec!["bank".to_string()], &vec!["foo".to_string()]);
-
-//     let data = decrypt_file(file_path.path().to_str().unwrap(), &pass).unwrap();
-
-//     // expect_that!(data, contains_substring("bank - username: foo, password: willbechanged"));
-
-//     env::remove_var("TEST_PASSWORD_INTERACTIVE");
-//     env::remove_var("TEST_MODE");
-// }
-
 #[googletest::test]
 fn test_confirm_interactive_pass_mode() {
     env::set_var("TEST_PASSWORD_INTERACTIVE", "no");
     expect_that!(confirm_interactive_pass_mode().unwrap(), eq("no"));
+    env::remove_var("TEST_PASSWORD_INTERACTIVE");
 
     env::set_var("TEST_PASSWORD_INTERACTIVE", "yes");
     expect_that!(confirm_interactive_pass_mode().unwrap(), eq("yes"));

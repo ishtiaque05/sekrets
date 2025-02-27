@@ -54,6 +54,7 @@ fn test_is_password_strong() {
 
 #[googletest::test]
 fn test_interactive_mode_in_test_mode() {
+    env::remove_var("TEST_MODE");
     env::set_var("PASSWORD_GENERATOR_CHOICE", "4");
     env::set_var("USER_TEST_PASS", "A^u4IfqU#PRla8+e");
 

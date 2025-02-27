@@ -257,12 +257,13 @@ fn handle_update(account: String, username: String) -> Result<()> {
 
 fn confirm_interactive_pass_mode() -> Result<String> {
     if std::env::var("TEST_PASSWORD_INTERACTIVE").is_ok() {
-        return Ok(std::env::var("TEST_PASSWORD_INTERACTIVE").unwrap());
-    }
-    let mut response = String::new();
-    std::io::stdin().read_line(&mut response)?;
+        Ok(std::env::var("TEST_PASSWORD_INTERACTIVE").unwrap())
+    } else {
+        let mut response = String::new();
+        std::io::stdin().read_line(&mut response)?;
 
-    Ok(response.trim().to_lowercase())
+        Ok(response.trim().to_lowercase())
+    }
 }
 
 #[cfg(test)]
