@@ -1,17 +1,30 @@
 use clap::Parser;
 use googletest::prelude::*;
-use std::env;
 use std::fs::File;
 use std::io::Write;
+use std::{env, vec};
 use tempfile::TempDir;
 
+use crate::cli::confirm_interactive_pass_mode;
+use crate::decryptor::decrypt_file;
 use crate::{
-    cli::{handle_update, prompt_user_password, run, Cli, Commands},
+    cli::{
+        generate_strong_password, handle_append, handle_update, print_credentials,
+        prompt_user_password, run, Cli, Commands,
+    },
     decryptor,
     encryptor::{encrypt_file, ENCRYPTED_FILENAME},
+    password_generator::PasswordGenerationError,
     paths::get_encrypted_file_path,
     tests::helpers::create_temp_plaintext_file,
 };
+
+fn make_encrypted_file(content: &str) -> String {
+    let file_path = create_temp_plaintext_file(content);
+
+    let pass = prompt_user_password();
+    encrypt_file(file_path.path().to_str().unwrap(), &pass).expect("Failed to encrypt file")
+}
 
 #[googletest::test]
 fn test_cli_encrypt_parsing() {
@@ -96,6 +109,16 @@ fn test_cli_update_creds() {
 }
 
 #[googletest::test]
+fn test_cli_password_generate() {
+    expect_that!(
+        Cli::parse_from(vec!["sekrets", "generate", "-p"]).command,
+        eq(&Commands::Generate {
+            generate_flag: true
+        })
+    );
+}
+
+#[googletest::test]
 fn test_cli_update_failure() {
     let res = Cli::try_parse_from(vec!["sekrets", "update", "--account", "github"]);
 
@@ -167,7 +190,9 @@ fn test_run_encrypt_command() {
     ]))
     .is_ok());
 
-    expect_pred!(get_encrypted_file_path(ENCRYPTED_FILENAME).exists())
+    expect_pred!(get_encrypted_file_path(ENCRYPTED_FILENAME).exists());
+
+    env::remove_var("TEST_MODE");
 }
 
 #[googletest::test]
@@ -327,6 +352,8 @@ fn test_handle_update() {
         decrypted_data,
         contains_substring("github - username: git, password: bar")
     );
+
+    env::remove_var("TEST_MODE");
 }
 
 #[googletest::test]
@@ -350,6 +377,8 @@ fn test_handle_update_username_not_found() {
         decrypted_data,
         contains_substring("github - username: me, password: change_me")
     );
+
+    env::remove_var("TEST_MODE");
 }
 
 #[googletest::test]
@@ -362,4 +391,97 @@ fn test_handle_update_failure() {
         res.unwrap_err().to_string(),
         contains_substring("Failed to read to file: No such file or directory")
     );
+
+    env::remove_var("TEST_MODE");
+}
+
+#[googletest::test]
+fn test_generate_strong_password() {
+    env::set_var("TEST_MODE", "1");
+
+    expect_that!(generate_strong_password(true), ok(()));
+    expect_that!(
+        generate_strong_password(false)
+            .unwrap_err()
+            .downcast_ref::<PasswordGenerationError>(),
+        some(eq(&PasswordGenerationError::NoChoiceSelected))
+    );
+
+    env::remove_var("TEST_MODE");
+}
+
+#[googletest::test]
+fn test_print_credentials_fail() {
+    make_encrypted_file("bank - username: foo, password: bar");
+
+    let res = print_credentials(&["git".to_string()], vec![]);
+
+    expect_that!(res, ok(()))
+}
+
+#[googletest::test]
+fn test_handle_append_success_nonexisting_acc() {
+    env::set_var("TEST_MODE", "1");
+
+    let encrypted_file_path = make_encrypted_file("bank - username: foo, password: bar");
+    let _ = handle_append(&["github".to_string()], &["git".to_string()]);
+
+    let data = decrypt_file(&encrypted_file_path, &prompt_user_password()).unwrap();
+
+    expect_that!(
+        data,
+        contains_substring("github - username: git, password: bar")
+    );
+
+    env::remove_var("TEST_MODE");
+}
+
+#[googletest::test]
+fn test_handle_append_success_existing_acc_pass_update() {
+    env::set_var("TEST_PASSWORD_INTERACTIVE", "yes");
+    env::set_var("TEST_MODE", "1");
+
+    let encrypted_file_path = make_encrypted_file("bank - username: foo, password: willbechanged");
+    let _ = handle_append(&["bank".to_string()], &["foo".to_string()]);
+
+    let data = decrypt_file(&encrypted_file_path, &prompt_user_password()).unwrap();
+
+    expect_that!(
+        data,
+        contains_substring("bank - username: foo, password: bar")
+    );
+
+    env::remove_var("TEST_PASSWORD_INTERACTIVE");
+    env::remove_var("TEST_MODE");
+}
+
+// #[googletest::test]
+// fn test_handle_append_success_existing_acc_no_pass_update() {
+//     env::set_var("TEST_PASSWORD_INTERACTIVE", "no");
+//     env::set_var("TEST_MODE", "1");
+
+//     let file_path = create_temp_plaintext_file("bank - username: foo, password: willbechanged");
+
+//     let pass = prompt_user_password();
+//     encrypt_file(file_path.path().to_str().unwrap(), &pass).expect("Failed to encrypt file");
+
+//     let _= handle_append(&vec!["bank".to_string()], &vec!["foo".to_string()]);
+
+//     let data = decrypt_file(file_path.path().to_str().unwrap(), &pass).unwrap();
+
+//     // expect_that!(data, contains_substring("bank - username: foo, password: willbechanged"));
+
+//     env::remove_var("TEST_PASSWORD_INTERACTIVE");
+//     env::remove_var("TEST_MODE");
+// }
+
+#[googletest::test]
+fn test_confirm_interactive_pass_mode() {
+    env::set_var("TEST_PASSWORD_INTERACTIVE", "no");
+    expect_that!(confirm_interactive_pass_mode().unwrap(), eq("no"));
+
+    env::set_var("TEST_PASSWORD_INTERACTIVE", "yes");
+    expect_that!(confirm_interactive_pass_mode().unwrap(), eq("yes"));
+
+    env::remove_var("TEST_PASSWORD_INTERACTIVE");
 }

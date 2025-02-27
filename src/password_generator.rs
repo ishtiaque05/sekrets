@@ -6,9 +6,8 @@ use zxcvbn::zxcvbn;
 const DEFAULT_PASSWORD_LENGTH: usize = 16;
 
 #[derive(Error, Debug)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 pub enum PasswordGenerationError {
-    #[error("Password Cannot be blank")]
-    IsBlank,
     #[error("Password Cannot be weak entrophy < 4")]
     IsWeak,
     #[error("Password generation is not selected")]
@@ -80,8 +79,16 @@ impl PasswordGenerator {
         println!("4) Enter your own password");
 
         print!("Enter choice (1-5): ");
-        io::stdout().flush().unwrap();
-        let choice = read_usize();
+
+        let choice = if std::env::var("PASSWORD_GENERATOR_CHOICE").is_ok() {
+            std::env::var("PASSWORD_GENERATOR_CHOICE")
+                .ok()
+                .and_then(|val| val.parse::<usize>().ok())
+                .unwrap_or(4)
+        } else {
+            io::stdout().flush().unwrap();
+            read_usize()
+        };
 
         let password_generator = if choice != 4 {
             println!("Enter password length: ");
@@ -103,10 +110,6 @@ impl PasswordGenerator {
         };
 
         println!("\nGenerated Password: {}", password);
-
-        if password.is_empty() {
-            return Err(PasswordGenerationError::IsBlank);
-        }
 
         match is_password_strong(&password) {
             true => {
@@ -131,11 +134,16 @@ fn is_password_strong(password: &str) -> bool {
     }
 }
 
-/// Reads an integer (usize) from user input
+#[cfg(not(test))]
 fn read_usize() -> usize {
     let mut input = String::new();
     io::stdin().read_line(&mut input).unwrap();
     input.trim().parse().unwrap_or(0)
+}
+
+#[cfg(test)]
+fn read_usize() -> usize {
+    16
 }
 
 #[cfg(not(test))]
@@ -150,10 +158,9 @@ pub fn prompt_user_password() -> String {
     }
 }
 
-/// Test mode: Returns a dummy password instead of asking for input
 #[cfg(test)]
 pub fn prompt_user_password() -> String {
-    "foo".to_string()
+    std::env::var("USER_TEST_PASS").unwrap_or("foo".to_string())
 }
 
 #[cfg(test)]
