@@ -1,4 +1,3 @@
-
 use clap::{Parser, Subcommand};
 
 use anyhow::Result;
@@ -64,7 +63,7 @@ pub enum Commands {
 }
 
 pub fn run(cli: Cli) -> Result<()> {
-    crate::paths::ensure_dirs();
+    crate::helpers::directories::ensure_dirs();
 
     commands::handle_command(cli.command)
 }

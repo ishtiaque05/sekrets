@@ -1,8 +1,8 @@
 use crate::{
-    credential_file_parser::{CredentialFileParser, CredentialHashMap},
-    credentials::Credential,
-    decryptor, encryptor,
-    paths::get_encrypted_file_path,
+    encryption::{self, decryptor, encryptor},
+    helpers::directories::get_encrypted_file_path,
+    secrets::credential_file_parser::{CredentialFileParser, CredentialHashMap},
+    secrets::credentials::Credential,
     types::FileError,
 };
 
@@ -13,7 +13,7 @@ pub struct CredentialManager {
 
 impl CredentialManager {
     pub fn new(master_password: String) -> Result<Self, FileError> {
-        let encrypted_filepath = get_encrypted_file_path(crate::encryptor::ENCRYPTED_FILENAME)
+        let encrypted_filepath = get_encrypted_file_path(encryption::encryptor::ENCRYPTED_FILENAME)
             .to_string_lossy()
             .to_string();
         let decrypted_data = decryptor::decrypt_file(&encrypted_filepath, &master_password)?;

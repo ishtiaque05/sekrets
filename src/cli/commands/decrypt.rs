@@ -1,6 +1,11 @@
 use anyhow::Result;
 
-use crate::{credential_file_parser::CredentialFileParser, decryptor, encryptor::ENCRYPTED_FILENAME, password_generator::prompt_user_password, paths::get_encrypted_file_path};
+use crate::{
+    encryption::{decryptor, encryptor::ENCRYPTED_FILENAME},
+    helpers::directories::get_encrypted_file_path,
+    secrets::credential_file_parser::CredentialFileParser,
+    secrets::password_generator::prompt_user_password,
+};
 
 pub fn handle_decrypt(accounts: &[String], usernames: &[String]) -> Result<()> {
     if usernames.is_empty() {

@@ -1,7 +1,6 @@
 use super::*;
-use crate::decryptor::decrypt_file;
-use crate::encryptor::ENCRYPTED_FILENAME;
-use crate::{credentials::Credential, paths::get_encrypted_file_path};
+use crate::encryption::{decryptor::decrypt_file, encryptor::ENCRYPTED_FILENAME};
+use crate::{helpers::directories::get_encrypted_file_path, secrets::credentials::Credential};
 use googletest::prelude::*;
 use std::collections::HashMap;
 

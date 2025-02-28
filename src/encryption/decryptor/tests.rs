@@ -1,5 +1,5 @@
 use super::*;
-use crate::encryptor::encrypt_file;
+use crate::encryption::encryptor::encrypt_file;
 use crate::types::FileError;
 use googletest::prelude::*;
 

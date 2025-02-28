@@ -1,4 +1,7 @@
-use crate::{credential_manager::CredentialManager, password_generator::{prompt_user_password, PasswordGenerator}};
+use crate::{
+    secrets::credential_manager::CredentialManager,
+    secrets::password_generator::{prompt_user_password, PasswordGenerator},
+};
 use anyhow::Result;
 
 pub fn handle_update(account: String, username: String) -> Result<()> {

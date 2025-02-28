@@ -1,4 +1,4 @@
-use crate::{paths::get_encrypted_file_path, types::FileError};
+use crate::{helpers::directories::get_encrypted_file_path, types::FileError};
 use aes_gcm::{
     aead::{AeadInPlace, KeyInit},
     Aes256Gcm, Nonce,

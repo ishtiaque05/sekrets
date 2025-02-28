@@ -1,17 +1,18 @@
 use super::*;
 use googletest::prelude::*;
-use std::{ fs::File, io::Write, vec };
+use std::{fs::File, io::Write, vec};
 use temp_env::{with_var, with_vars};
 use tempfile::TempDir;
 
 use crate::{
     cli::commands::*,
-    decryptor::{self, decrypt_file},
-    encryptor::{encrypt_file, ENCRYPTED_FILENAME},
-    password_generator::PasswordGenerationError,
-    paths::get_encrypted_file_path,
+    encryption::{
+        decryptor::{self, decrypt_file},
+        encryptor::{encrypt_file, ENCRYPTED_FILENAME},
+    },
+    helpers::directories::get_encrypted_file_path,
+    secrets::password_generator::{prompt_user_password, PasswordGenerationError},
     tests::helpers::create_temp_plaintext_file,
-    password_generator::prompt_user_password
 };
 
 fn make_encrypted_file(content: &str) -> String {

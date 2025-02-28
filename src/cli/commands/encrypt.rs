@@ -1,4 +1,4 @@
-use crate::{encryptor, password_generator::prompt_user_password};
+use crate::{encryption::encryptor, secrets::password_generator::prompt_user_password};
 use anyhow::Result;
 
 pub fn handle_encrypt(file: &str) -> Result<()> {

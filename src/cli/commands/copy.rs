@@ -1,6 +1,8 @@
 use std::{fs, path::Path};
 
-use crate::{encryptor::ENCRYPTED_FILENAME, paths::get_encrypted_file_path};
+use crate::{
+    encryption::encryptor::ENCRYPTED_FILENAME, helpers::directories::get_encrypted_file_path,
+};
 use anyhow::{Context, Result};
 
 pub fn handle_copy(dest_dir: &str) -> Result<()> {

@@ -1,4 +1,14 @@
-use crate::{cli::commands::util::confirm_interactive_pass_mode, credential_file_parser::CredentialHashMap, credential_manager::CredentialManager, credentials::Credential, encryptor::ENCRYPTED_FILENAME, password_generator::{prompt_user_password, PasswordGenerator}, paths::get_encrypted_file_path};
+use crate::{
+    cli::commands::util::confirm_interactive_pass_mode,
+    encryption::encryptor::ENCRYPTED_FILENAME,
+    helpers::directories::get_encrypted_file_path,
+    secrets::{
+        credential_file_parser::CredentialHashMap,
+        credential_manager::CredentialManager,
+        credentials::Credential,
+        password_generator::{prompt_user_password, PasswordGenerator},
+    },
+};
 use anyhow::Result;
 
 pub fn handle_append(accounts: &[String], usernames: &[String]) -> Result<()> {
