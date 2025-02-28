@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::credentials::Credential;
+use crate::secrets::credentials::Credential;
 
 pub type CredentialHashMap = HashMap<(String, String), Credential>;
 

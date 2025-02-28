@@ -1,7 +1,7 @@
 use std::vec;
 
 use super::*;
-use crate::credential_file_parser::ParsingError::AccountWithUsernameNotFound;
+use crate::secrets::credential_file_parser::ParsingError::AccountWithUsernameNotFound;
 use googletest::prelude::*;
 
 #[googletest::test]
