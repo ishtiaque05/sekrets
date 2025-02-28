@@ -1,4 +1,5 @@
 # Sekrets - Secure File Encryption in Rust
+![Build](https://github.com/ishtiaque05/sekrets/actions/workflows/rust.yml/badge.svg)
 
 Sekrets is a Rust-based file encryption tool that securely encrypts and stores sensitive credentials. It uses **AES-256-GCM encryption** with **Argon2 password hashing** for strong key derivation.
 
