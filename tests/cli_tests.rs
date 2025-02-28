@@ -113,5 +113,15 @@ fn test_sekrets_tool() {
 
     expect_pred!(Path::new(&secret_enc_path).exists());
 
+    run_sekrets_command(&["update", "-a", "bank", "-u", "user4"])
+        .env("PASSWORD_GENERATOR_CHOICE", "4")
+        .env("USER_TEST_PASS", "A^u4IfqU#PRla8+e")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Enter new password for account: bank, username: user4"))
+        .stdout(predicate::str::contains("Password updated successfully"));
+
+    run_sekrets_command(&["generate", "-p"]).assert().success();
+
     TestCleanup::clean();
 }
