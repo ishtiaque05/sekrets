@@ -3,11 +3,12 @@ use std::{fs, path::Path};
 use clap::{Parser, Subcommand};
 
 use crate::{
+    credential_file_parser::{CredentialFileParser, CredentialHashMap},
     credential_manager::CredentialManager,
     credentials::Credential,
     decryptor,
     encryptor::{self, ENCRYPTED_FILENAME},
-    parser::Parser as CredentialParser,
+    password_generator::{prompt_user_password, PasswordGenerationError, PasswordGenerator},
     paths::{self, get_encrypted_file_path},
 };
 use anyhow::{Context, Result};
@@ -64,6 +65,11 @@ enum Commands {
         #[arg(short, long = "username", required = true)]
         username: String,
     },
+
+    Generate {
+        #[arg(short = 'p', long = "password", default_value_t = false)]
+        generate_flag: bool,
+    },
 }
 
 pub fn run(cli: Cli) -> Result<()> {
@@ -81,6 +87,16 @@ pub fn run(cli: Cli) -> Result<()> {
             usernames,
         } => handle_append(&accounts, &usernames),
         Commands::Update { account, username } => handle_update(account, username),
+        Commands::Generate { generate_flag } => generate_strong_password(generate_flag),
+    }
+}
+
+fn generate_strong_password(flag: bool) -> Result<()> {
+    if flag {
+        PasswordGenerator::interactive_mode().map_err(anyhow::Error::from)?;
+        Ok(())
+    } else {
+        Err(PasswordGenerationError::NoChoiceSelected.into())
     }
 }
 
@@ -115,7 +131,7 @@ fn print_credentials(accounts: &[String], usernames: Vec<Option<String>>) -> Res
     let encrypted_filepath = get_encrypted_file_path(ENCRYPTED_FILENAME);
 
     let decrypted_data = decryptor::decrypt_file(&encrypted_filepath.to_string_lossy(), &password)?;
-    let parser = CredentialParser::new(decrypted_data);
+    let parser = CredentialFileParser::new(decrypted_data);
 
     for (account, username) in accounts.iter().zip(usernames.iter()) {
         match parser.get_credentials(username.clone(), account.to_string()) {
@@ -162,74 +178,93 @@ fn handle_append(accounts: &[String], usernames: &[String]) -> Result<()> {
         ));
     }
 
-    let decrypted_data =
-        decryptor::decrypt_file(&encrypted_filepath.to_string_lossy(), &master_pass)?;
-    let new_data = generate_new_credentials(&decrypted_data, accounts, usernames)?;
+    let mut credential_manager = CredentialManager::new(master_pass.clone())?;
 
-    encryptor::encrypt_text(&new_data, &master_pass)?;
-    println!("✅ Credentials successfully added!");
+    for (account, username) in accounts.iter().zip(usernames.iter()) {
+        let key = (account.clone(), username.clone());
+
+        if let Some(existing_cred) = credential_manager.credentials.get_mut(&key) {
+            println!(
+                "Credential already exists for account: {}, username: {}",
+                account, username
+            );
+            println!("Do you want to update the password? (yes/no): ");
+
+            let response = confirm_interactive_pass_mode()?;
+
+            if response == "yes" {
+                println!(
+                    "Enter new password for account: {}, username: {}",
+                    account, username
+                );
+
+                let new_pass = PasswordGenerator::interactive_mode().expect("new password");
+
+                existing_cred.update_pass(new_pass);
+
+                println!("✅ Password updated successfully!");
+            } else {
+                println!(
+                    "Password update skipped for account {}, username: {}",
+                    account, username
+                )
+            }
+        } else {
+            add_new_creds(account, username, &mut credential_manager.credentials);
+        }
+    }
+
+    credential_manager.save_credentials()?;
+
+    println!("✅ Changes successfully saved!");
 
     Ok(())
+}
+
+fn add_new_creds(account: &str, username: &str, new_credentials: &mut CredentialHashMap) {
+    println!(
+        "Adding new credential for account: {}, username: {}",
+        account, username
+    );
+    let password = PasswordGenerator::interactive_mode().expect("interactive pass not to fail");
+
+    new_credentials.insert(
+        (account.to_string(), username.to_string()),
+        Credential::new(account.to_string(), username.to_string(), password),
+    );
 }
 
 fn handle_update(account: String, username: String) -> Result<()> {
     let password = prompt_user_password();
     let mut credential_manager = CredentialManager::new(password)?;
 
-    println!(
-        "Enter new password for account: {}, username: {}",
-        account, username
-    );
-    let new_password = prompt_user_password();
+    if let Some(cred) = credential_manager.find_creds(&account, &username) {
+        println!(
+            "Enter new password for account: {}, username: {}",
+            account, username
+        );
 
-    credential_manager
-        .update_password(&account, &username, &new_password)
-        .expect("update password to succeed!");
+        let new_password = PasswordGenerator::interactive_mode()?;
+
+        cred.update_pass(new_password);
+    }
+
+    credential_manager.save_credentials()?;
+    println!("✅ Password updated successfully!");
 
     Ok(())
 }
 
-fn generate_new_credentials(
-    existing_data: &str,
-    accounts: &[String],
-    usernames: &[String],
-) -> Result<String> {
-    let mut new_data = existing_data.to_string();
-
-    let credentials: Vec<Credential> = accounts
-        .iter()
-        .zip(usernames.iter())
-        .map(|(account, username)| {
-            println!(
-                "Enter password credential for account: {}, username: {}",
-                account, username
-            );
-
-            Credential::new(account.clone(), username.clone(), prompt_user_password())
-        })
-        .collect();
-
-    for cred in &credentials {
-        new_data.push_str(&format!("\n{}", cred.format_as_str()));
-    }
-
-    Ok(new_data)
-}
-
-#[cfg(not(test))]
-pub fn prompt_user_password() -> String {
-    if std::env::var("TEST_MODE").is_ok() {
-        "foo".to_string()
+fn confirm_interactive_pass_mode() -> Result<String> {
+    // For testing purpose
+    if std::env::var("TEST_PASSWORD_INTERACTIVE").is_ok() {
+        Ok(std::env::var("TEST_PASSWORD_INTERACTIVE").unwrap())
     } else {
-        use rpassword::read_password;
-        println!("Enter password: ");
-        read_password().expect("Failed to read password")
-    }
-}
+        let mut response = String::new();
+        std::io::stdin().read_line(&mut response)?;
 
-#[cfg(test)]
-pub fn prompt_user_password() -> String {
-    "foo".to_string()
+        Ok(response.trim().to_lowercase())
+    }
 }
 
 #[cfg(test)]

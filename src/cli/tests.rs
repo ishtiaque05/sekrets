@@ -1,17 +1,31 @@
 use clap::Parser;
 use googletest::prelude::*;
-use std::env;
 use std::fs::File;
 use std::io::Write;
+use std::vec;
+use temp_env::{with_var, with_vars};
 use tempfile::TempDir;
 
+use crate::cli::confirm_interactive_pass_mode;
+use crate::decryptor::decrypt_file;
 use crate::{
-    cli::{handle_update, prompt_user_password, run, Cli, Commands},
+    cli::{
+        generate_strong_password, handle_append, handle_update, print_credentials,
+        prompt_user_password, run, Cli, Commands,
+    },
     decryptor,
     encryptor::{encrypt_file, ENCRYPTED_FILENAME},
+    password_generator::PasswordGenerationError,
     paths::get_encrypted_file_path,
     tests::helpers::create_temp_plaintext_file,
 };
+
+fn make_encrypted_file(content: &str) -> String {
+    let file_path = create_temp_plaintext_file(content);
+
+    let pass = prompt_user_password();
+    encrypt_file(file_path.path().to_str().unwrap(), &pass).expect("Failed to encrypt file")
+}
 
 #[googletest::test]
 fn test_cli_encrypt_parsing() {
@@ -96,6 +110,16 @@ fn test_cli_update_creds() {
 }
 
 #[googletest::test]
+fn test_cli_password_generate() {
+    expect_that!(
+        Cli::parse_from(vec!["sekrets", "generate", "-p"]).command,
+        eq(&Commands::Generate {
+            generate_flag: true
+        })
+    );
+}
+
+#[googletest::test]
 fn test_cli_update_failure() {
     let res = Cli::try_parse_from(vec!["sekrets", "update", "--account", "github"]);
 
@@ -133,233 +157,291 @@ fn test_decrypt_account_not_equal_username() {
 
 #[googletest::test]
 fn test_decrypt_account_equal_username() {
-    env::set_var("TEST_MODE", "1");
+    with_var("TEST_MODE", Some("1"), || {
+        let file_path = create_temp_plaintext_file(
+            "github - username: foo, password: bar\nbank - username: abc, password: efg",
+        );
 
-    let file_path = create_temp_plaintext_file(
-        "github - username: foo, password: bar\nbank - username: abc, password: efg",
-    );
+        let pass = prompt_user_password();
+        let _ = encrypt_file(file_path.path().to_str().unwrap(), &pass).expect("Encryption failed");
 
-    let pass = prompt_user_password();
-    let _ = encrypt_file(file_path.path().to_str().unwrap(), &pass).expect("Encryption failed");
+        let result = run(Cli::parse_from(vec![
+            "sekrets", "decrypt", "-a", "bank", "-u", "abc", "-a", "github", "-u", "foo",
+        ]));
 
-    let result = run(Cli::parse_from(vec![
-        "sekrets", "decrypt", "-a", "bank", "-u", "abc", "-a", "github", "-u", "foo",
-    ]));
-
-    expect_pred!(result.is_ok());
+        expect_pred!(result.is_ok());
+    });
 }
 
 #[googletest::test]
 fn test_run_encrypt_command() {
-    env::set_var("TEST_MODE", "1");
+    with_var("TEST_MODE", Some("1"), || {
+        let temp_dir = TempDir::new().expect("Failed to create temporary directory");
+        let file_path = temp_dir.path().join("test_input.txt");
 
-    let temp_dir = TempDir::new().expect("Failed to create temporary directory");
-    let file_path = temp_dir.path().join("test_input.txt");
+        let mut file = File::create(&file_path).expect("Failed to create file");
+        writeln!(file, "github - username: foo, password: bar").expect("Failed to write to file");
 
-    let mut file = File::create(&file_path).expect("Failed to create file");
-    writeln!(file, "github - username: foo, password: bar").expect("Failed to write to file");
+        expect_pred!(run(Cli::parse_from(vec![
+            "sekrets",
+            "encrypt",
+            "--file",
+            file_path.to_str().unwrap()
+        ]))
+        .is_ok());
 
-    expect_pred!(run(Cli::parse_from(vec![
-        "sekrets",
-        "encrypt",
-        "--file",
-        file_path.to_str().unwrap()
-    ]))
-    .is_ok());
-
-    expect_pred!(get_encrypted_file_path(ENCRYPTED_FILENAME).exists())
+        expect_pred!(get_encrypted_file_path(ENCRYPTED_FILENAME).exists());
+    });
 }
 
 #[googletest::test]
 fn test_run_decrypt_command() {
-    env::set_var("TEST_MODE", "1");
+    with_var("TEST_MODE", Some("1"), || {
+        let file_path = create_temp_plaintext_file("github - username: foo, password: bar");
 
-    let file_path = create_temp_plaintext_file("github - username: foo, password: bar");
+        let pass = prompt_user_password();
+        let _ = encrypt_file(file_path.path().to_str().unwrap(), &pass).expect("Encryption failed");
 
-    let pass = prompt_user_password();
-    let _ = encrypt_file(file_path.path().to_str().unwrap(), &pass).expect("Encryption failed");
-
-    expect_pred!(run(Cli::parse_from(vec![
-        "sekrets",
-        "decrypt",
-        "--account",
-        "github"
-    ]))
-    .is_ok());
-
-    env::remove_var("TEST_MODE");
+        expect_pred!(run(Cli::parse_from(vec![
+            "sekrets",
+            "decrypt",
+            "--account",
+            "github"
+        ]))
+        .is_ok());
+    });
 }
 
 #[googletest::test]
 fn test_prompt_user_password_mocked() {
-    env::set_var("TEST_MODE", "1");
-    expect_that!(prompt_user_password(), eq("foo"));
-
-    env::remove_var("TEST_MODE")
+    with_var("TEST_MODE", Some("1"), || {
+        expect_that!(prompt_user_password(), eq("foo"));
+    });
 }
 
 #[googletest::test]
 fn test_run_copy_command() {
-    env::set_var("TEST_MODE", "1");
+    with_var("TEST_MODE", Some("1"), || {
+        let dest_dir = TempDir::new().expect("Failed to create destination directory");
+        let file_path = create_temp_plaintext_file("hello rust");
 
-    let dest_dir = TempDir::new().expect("Failed to create destination directory");
-    let file_path = create_temp_plaintext_file("hello rust");
+        let pass = prompt_user_password();
+        let _ = encrypt_file(file_path.path().to_str().unwrap(), &pass)
+            .expect("Failed to encrypt file");
 
-    let pass = prompt_user_password();
-    let _ =
-        encrypt_file(file_path.path().to_str().unwrap(), &pass).expect("Failed to encrypt file");
+        expect_pred!(run(Cli::parse_from(vec![
+            "sekrets",
+            "copy",
+            "--dest",
+            dest_dir.path().to_str().unwrap(),
+        ]))
+        .is_ok());
 
-    expect_pred!(run(Cli::parse_from(vec![
-        "sekrets",
-        "copy",
-        "--dest",
-        dest_dir.path().to_str().unwrap(),
-    ]))
-    .is_ok());
-
-    expect_pred!(dest_dir.path().join(ENCRYPTED_FILENAME).exists());
-
-    env::remove_var("TEST_MODE");
+        expect_pred!(dest_dir.path().join(ENCRYPTED_FILENAME).exists());
+    });
 }
 
 #[googletest::test]
 fn test_run_append_command() {
-    env::set_var("TEST_MODE", "1");
+    with_var("TEST_MODE", Some("1"), || {
+        let file_path = create_temp_plaintext_file("github - username: foo, password: bar");
+        let _ = encrypt_file(file_path.path().to_str().unwrap(), "foo")
+            .expect("Failed to encrypt file");
 
-    let file_path = create_temp_plaintext_file("github - username: foo, password: bar");
-    let pass = prompt_user_password();
-    let _ =
-        encrypt_file(file_path.path().to_str().unwrap(), &pass).expect("Failed to encrypt file");
+        expect_pred!(run(Cli::parse_from(vec![
+            "sekrets",
+            "append",
+            "--account",
+            "bank",
+            "--username",
+            "john_doe",
+        ]))
+        .is_ok());
 
-    expect_pred!(run(Cli::parse_from(vec![
-        "sekrets",
-        "append",
-        "--account",
-        "bank",
-        "--username",
-        "john_doe",
-    ]))
-    .is_ok());
+        let decrypted_data = decryptor::decrypt_file(
+            &get_encrypted_file_path(ENCRYPTED_FILENAME).to_string_lossy(),
+            "foo",
+        )
+        .expect("Failed to decrypt file");
 
-    let decrypted_data = decryptor::decrypt_file(
-        &get_encrypted_file_path(ENCRYPTED_FILENAME).to_string_lossy(),
-        &pass,
-    )
-    .expect("Failed to decrypt file");
-
-    expect_that!(
-        decrypted_data,
-        contains_substring("bank - username: john_doe")
-    );
-
-    env::remove_var("TEST_MODE");
+        expect_that!(
+            decrypted_data,
+            contains_substring("bank - username: john_doe")
+        );
+    });
 }
 
 #[googletest::test]
 fn test_run_append_mismatched_accounts_usernames() {
-    env::set_var("TEST_MODE", "1");
+    with_var("TEST_MODE", Some("1"), || {
+        let file_path = create_temp_plaintext_file("github - username: foo, password: bar");
+        let pass = prompt_user_password();
+        let _ = encrypt_file(file_path.path().to_str().unwrap(), &pass)
+            .expect("Failed to encrypt file");
 
-    let file_path = create_temp_plaintext_file("github - username: foo, password: bar");
-    let pass = prompt_user_password();
-    let _ =
-        encrypt_file(file_path.path().to_str().unwrap(), &pass).expect("Failed to encrypt file");
+        let result = run(Cli::parse_from(vec![
+            "sekrets",
+            "append",
+            "--account",
+            "bank",
+            "--username",
+            "john_doe",
+            "--account",
+            "email",
+        ]));
 
-    let result = run(Cli::parse_from(vec![
-        "sekrets",
-        "append",
-        "--account",
-        "bank",
-        "--username",
-        "john_doe",
-        "--account",
-        "email",
-    ]));
-
-    expect_pred!(result.is_err());
-    expect_that!(
-        result.unwrap_err().to_string(),
-        contains_substring("Mismatched accounts and usernames")
-    );
-
-    env::remove_var("TEST_MODE");
+        expect_pred!(result.is_err());
+        expect_that!(
+            result.unwrap_err().to_string(),
+            contains_substring("Mismatched accounts and usernames")
+        );
+    });
 }
 
 #[googletest::test]
 fn test_run_append_no_encrypted_file() {
-    env::set_var("TEST_MODE", "1");
+    with_var("TEST_MODE", Some("1"), || {
+        let result = run(Cli::parse_from(vec![
+            "sekrets",
+            "append",
+            "--account",
+            "bank",
+            "--username",
+            "john_doe",
+        ]));
 
-    let result = run(Cli::parse_from(vec![
-        "sekrets",
-        "append",
-        "--account",
-        "bank",
-        "--username",
-        "john_doe",
-    ]));
-
-    expect_pred!(result.is_err());
-    expect_that!(
-        result.unwrap_err().to_string(),
-        contains_substring("does not exist! Encrypt file first")
-    );
-
-    env::remove_var("TEST_MODE");
+        expect_pred!(result.is_err());
+        expect_that!(
+            result.unwrap_err().to_string(),
+            contains_substring("does not exist! Encrypt file first")
+        );
+    });
 }
 
 #[googletest::test]
 fn test_handle_update() {
-    env::set_var("TEST_MODE", "1");
+    with_var("TEST_MODE", Some("1"), || {
+        let file_path = create_temp_plaintext_file("github - username: git, password: change_me");
+        let pass = prompt_user_password();
+        let _ = encrypt_file(file_path.path().to_str().unwrap(), &pass)
+            .expect("Failed to encrypt file");
 
-    let file_path = create_temp_plaintext_file("github - username: git, password: change_me");
-    let pass = prompt_user_password();
-    let _ =
-        encrypt_file(file_path.path().to_str().unwrap(), &pass).expect("Failed to encrypt file");
+        let _ = handle_update("github".to_string(), "git".to_string());
 
-    let _ = handle_update("github".to_string(), "git".to_string());
+        let decrypted_data = decryptor::decrypt_file(
+            &get_encrypted_file_path(ENCRYPTED_FILENAME).to_string_lossy(),
+            &pass,
+        )
+        .expect("Failed to decrypt file");
 
-    let decrypted_data = decryptor::decrypt_file(
-        &get_encrypted_file_path(ENCRYPTED_FILENAME).to_string_lossy(),
-        &pass,
-    )
-    .expect("Failed to decrypt file");
-
-    expect_that!(
-        decrypted_data,
-        contains_substring("github - username: git, password: foo")
-    );
+        expect_that!(
+            decrypted_data,
+            contains_substring("github - username: git, password: bar")
+        );
+    });
 }
 
 #[googletest::test]
 fn test_handle_update_username_not_found() {
-    env::set_var("TEST_MODE", "1");
+    with_var("TEST_MODE", Some("1"), || {
+        let file_path = create_temp_plaintext_file("github - username: me, password: change_me");
+        let pass = prompt_user_password();
+        let _ = encrypt_file(file_path.path().to_str().unwrap(), &pass)
+            .expect("Failed to encrypt file");
 
-    let file_path = create_temp_plaintext_file("github - username: me, password: change_me");
-    let pass = prompt_user_password();
-    let _ =
-        encrypt_file(file_path.path().to_str().unwrap(), &pass).expect("Failed to encrypt file");
+        let _ = handle_update("github".to_string(), "unknown".to_string());
 
-    let _ = handle_update("github".to_string(), "unknown".to_string());
+        let decrypted_data = decryptor::decrypt_file(
+            &get_encrypted_file_path(ENCRYPTED_FILENAME).to_string_lossy(),
+            &pass,
+        )
+        .expect("Failed to decrypt file");
 
-    let decrypted_data = decryptor::decrypt_file(
-        &get_encrypted_file_path(ENCRYPTED_FILENAME).to_string_lossy(),
-        &pass,
-    )
-    .expect("Failed to decrypt file");
-
-    expect_that!(
-        decrypted_data,
-        contains_substring("github - username: me, password: change_me")
-    );
+        expect_that!(
+            decrypted_data,
+            contains_substring("github - username: me, password: change_me")
+        );
+    });
 }
 
 #[googletest::test]
 fn test_handle_update_failure() {
-    env::set_var("TEST_MODE", "1");
+    with_var("TEST_MODE", Some("1"), || {
+        let res = handle_update("github".to_string(), "unknown".to_string());
 
-    let res = handle_update("github".to_string(), "unknown".to_string());
+        expect_that!(
+            res.unwrap_err().to_string(),
+            contains_substring("Failed to read to file: No such file or directory")
+        );
+    });
+}
 
-    expect_that!(
-        res.unwrap_err().to_string(),
-        contains_substring("Failed to read to file: No such file or directory")
+#[googletest::test]
+fn test_generate_strong_password() {
+    with_var("TEST_MODE", Some("1"), || {
+        expect_that!(generate_strong_password(true), ok(()));
+        expect_that!(
+            generate_strong_password(false)
+                .unwrap_err()
+                .downcast_ref::<PasswordGenerationError>(),
+            some(eq(&PasswordGenerationError::NoChoiceSelected))
+        );
+    });
+}
+
+#[googletest::test]
+fn test_print_credentials_fail() {
+    make_encrypted_file("bank - username: foo, password: bar");
+
+    let res = print_credentials(&["git".to_string()], vec![]);
+
+    expect_that!(res, ok(()))
+}
+
+#[googletest::test]
+fn test_handle_append_success_nonexisting_acc() {
+    with_var("TEST_MODE", Some("1"), || {
+        let encrypted_file_path = make_encrypted_file("bank - username: foo, password: bar");
+        let _ = handle_append(&["github".to_string()], &["git".to_string()]);
+
+        let data = decrypt_file(&encrypted_file_path, &prompt_user_password()).unwrap();
+
+        expect_that!(
+            data,
+            contains_substring("github - username: git, password: bar")
+        );
+    });
+}
+
+#[googletest::test]
+fn test_handle_append_success_existing_acc_pass_update() {
+    with_vars(
+        vec![
+            ("TEST_PASSWORD_INTERACTIVE", Some("yes")),
+            ("TEST_MODE", Some("1")),
+        ],
+        || {
+            let encrypted_file_path =
+                make_encrypted_file("bank - username: foo, password: willbechanged");
+            let _ = handle_append(&["bank".to_string()], &["foo".to_string()]);
+
+            let data = decrypt_file(&encrypted_file_path, &prompt_user_password()).unwrap();
+
+            expect_that!(
+                data,
+                contains_substring("bank - username: foo, password: bar")
+            );
+        },
     );
+}
+
+#[googletest::test]
+fn test_confirm_interactive_pass_mode() {
+    with_var("TEST_PASSWORD_INTERACTIVE", Some("no"), || {
+        expect_that!(confirm_interactive_pass_mode().unwrap(), eq("no"));
+    });
+
+    with_var("TEST_PASSWORD_INTERACTIVE", Some("yes"), || {
+        expect_that!(confirm_interactive_pass_mode().unwrap(), eq("yes"));
+    });
 }

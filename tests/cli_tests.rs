@@ -75,14 +75,14 @@ fn test_sekrets_tool() {
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "Enter password credential for account: bank, username: user4",
+            "Adding new credential for account: bank, username: user4",
         ));
 
     run_sekrets_command(&["decrypt", "-a", "bank", "-u", "user4"])
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "Account: bank - Username: user4, Password: foo",
+            "Account: bank - Username: user4, Password: bar",
         ));
 
     run_sekrets_command(&[
@@ -102,7 +102,7 @@ fn test_sekrets_tool() {
         "No credentials found for account: `bank\' with username: `userx\'",
     ))
     .stdout(predicate::str::contains(
-        "Account: bank - Username: user4, Password: foo",
+        "Account: bank - Username: user4, Password: bar",
     ));
 
     run_sekrets_command(&["copy", "-d", TestCleanup::root_path().to_str().unwrap()])

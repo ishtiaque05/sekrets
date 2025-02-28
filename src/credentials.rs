@@ -1,4 +1,4 @@
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct Credential {
     pub account: String,
     pub username: String,
@@ -12,6 +12,10 @@ impl Credential {
             username,
             password,
         }
+    }
+
+    pub fn update_pass(&mut self, new_pass: String) {
+        self.password = new_pass
     }
 
     pub fn format_as_str(&self) -> String {

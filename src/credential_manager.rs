@@ -1,11 +1,14 @@
 use crate::{
-    credentials::Credential, decryptor, encryptor, parser::Parser as CredentialParser,
-    paths::get_encrypted_file_path, types::FileError,
+    credential_file_parser::{CredentialFileParser, CredentialHashMap},
+    credentials::Credential,
+    decryptor, encryptor,
+    paths::get_encrypted_file_path,
+    types::FileError,
 };
 
 pub struct CredentialManager {
     master_password: String,
-    credentials: Vec<Credential>,
+    pub credentials: CredentialHashMap,
 }
 
 impl CredentialManager {
@@ -14,7 +17,7 @@ impl CredentialManager {
             .to_string_lossy()
             .to_string();
         let decrypted_data = decryptor::decrypt_file(&encrypted_filepath, &master_password)?;
-        let parser = CredentialParser::new(decrypted_data);
+        let parser = CredentialFileParser::new(decrypted_data);
 
         Ok(Self {
             master_password,
@@ -22,40 +25,23 @@ impl CredentialManager {
         })
     }
 
-    /// Update a credential's password
-    pub fn update_password(
-        &mut self,
-        account: &str,
-        username: &str,
-        new_password: &str,
-    ) -> Result<(), FileError> {
-        if let Some(cred) = self
-            .credentials
-            .iter_mut()
-            .find(|c| c.account == account && c.username == username)
-        {
-            cred.password = new_password.to_string();
-            self.save_credentials()?;
-            println!("✅ Password updated successfully!");
-        } else {
-            println!(
-                "⚠️ No credentials found for account: {} and username: {}",
-                account, username
-            );
-        }
-
-        Ok(())
+    pub fn find_creds(&mut self, account: &str, username: &str) -> Option<&mut Credential> {
+        self.credentials
+            .get_mut(&(account.to_string(), username.to_string()))
     }
 
-    /// Save credentials back to encrypted file
-    fn save_credentials(&self) -> Result<(), FileError> {
+    pub fn save_credentials(&self) -> Result<(), FileError> {
         let updated_data: String = self
             .credentials
-            .iter()
+            .values()
             .map(|c| c.format_as_str())
             .collect::<Vec<_>>()
             .join("\n");
         let _ = encryptor::encrypt_text(&updated_data, &self.master_password);
+
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests;

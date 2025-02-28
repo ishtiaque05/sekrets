@@ -1,7 +1,7 @@
 use std::vec;
 
 use super::*;
-use crate::parser::ParsingError::AccountWithUsernameNotFound;
+use crate::credential_file_parser::ParsingError::AccountWithUsernameNotFound;
 use googletest::prelude::*;
 
 #[googletest::test]
@@ -9,7 +9,7 @@ fn test_successful_credential_parsing() {
     let account = "my_account".to_string();
     let data = "my_account - username: user123, password: pass456\nanother_account - username: other, password: secret";
 
-    let credential = Parser::new(data.into());
+    let credential = CredentialFileParser::new(data.into());
     let result = credential.get_credentials(None, account.clone());
 
     expect_that!(
@@ -27,7 +27,7 @@ fn test_account_not_found() {
     let account = "unknown_account".to_string();
     let data = "my_account - username: user123, password: pass456";
 
-    let credential = Parser::new(data.to_string());
+    let credential = CredentialFileParser::new(data.to_string());
     let result = credential.get_credentials(None, account);
 
     expect_that!(
@@ -41,16 +41,12 @@ fn test_malformed_credentials() {
     let account = "my_account".to_string();
     let data = "my_account - username user123, password pass456".to_string();
 
-    let credential = Parser::new(data);
+    let credential = CredentialFileParser::new(data);
     let result = credential.get_credentials(None, account.clone());
 
     expect_that!(
         result,
-        ok(eq(&vec![Credential {
-            account,
-            username: "".into(),
-            password: "".into()
-        }]))
+        err(eq(&ParsingError::AccountNotFound("my_account".to_string())))
     )
 }
 
@@ -62,7 +58,7 @@ fn test_multiple_accounts() {
                 account3 - username: user3, password: pass3"
         .to_string();
 
-    let parser = Parser::new(data);
+    let parser = CredentialFileParser::new(data);
     let result = parser.get_credentials(None, account.clone());
 
     expect_pred!(result.is_ok());
@@ -94,7 +90,7 @@ fn test_username_account_match() {
                 account3 - username: user3, password: pass3"
         .to_string();
 
-    let parser = Parser::new(data);
+    let parser = CredentialFileParser::new(data);
     let result = parser.get_credentials(Some("user2".to_string()), account.clone());
 
     expect_pred!(result.is_ok());
@@ -120,7 +116,7 @@ fn test_username_doesnot_match() {
                 account3 - username: user3, password: pass3"
         .to_string();
 
-    let parser = Parser::new(data);
+    let parser = CredentialFileParser::new(data);
     let result = parser.get_credentials(Some("foo".to_string()), account.clone());
 
     expect_that!(
@@ -130,4 +126,41 @@ fn test_username_doesnot_match() {
             eq("foo")
         )))
     );
+}
+
+#[googletest::test]
+fn test_get_all_credentials() {
+    let data = "account - username: user1, password: pass1\n\
+                account - username: user2, password: pass2\n\
+                account3 - username: user3, password: pass3"
+        .to_string();
+
+    let parser = CredentialFileParser::new(data);
+
+    let result = parser.get_all_credentials();
+
+    expect_that!(result.len(), eq(3));
+    let val = result
+        .get(&("account".to_string(), "user2".to_string()))
+        .unwrap();
+
+    expect_that!(
+        val,
+        eq(&Credential {
+            account: "account".to_string(),
+            username: "user2".to_string(),
+            password: "pass2".to_string()
+        })
+    )
+}
+
+#[googletest::test]
+fn test_get_all_credentials_failure_wrong_format_file() {
+    let data = "account: username: user1 password: pass1\n".to_string();
+
+    let parser = CredentialFileParser::new(data);
+
+    let result = parser.get_all_credentials();
+
+    expect_pred!(result.is_empty())
 }
