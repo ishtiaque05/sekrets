@@ -36,3 +36,27 @@ To copy the encrypted file to a new location:
 sekret copy -d /backup/location
 ```
 - The encrypted file is copied to the specified directory
+
+## Update Existing Credentials
+
+To update an existing credential:
+
+```
+sekrets update -a github -u myusername
+```
+
+- You will be prompted to enter a new password for the specified account and username.
+
+- The password is securely updated.
+
+## Generate a Secure Password
+
+To generate a secure password:
+
+```
+sekrets generate -p
+```
+
+- A strong password is generated and displayed.
+
+- This can be used when updating or adding credentials.
