@@ -1,23 +1,17 @@
-use clap::Parser;
+use super::*;
 use googletest::prelude::*;
-use std::fs::File;
-use std::io::Write;
-use std::vec;
+use std::{ fs::File, io::Write, vec };
 use temp_env::{with_var, with_vars};
 use tempfile::TempDir;
 
-use crate::cli::confirm_interactive_pass_mode;
-use crate::decryptor::decrypt_file;
 use crate::{
-    cli::{
-        generate_strong_password, handle_append, handle_update, print_credentials,
-        prompt_user_password, run, Cli, Commands,
-    },
-    decryptor,
+    cli::commands::*,
+    decryptor::{self, decrypt_file},
     encryptor::{encrypt_file, ENCRYPTED_FILENAME},
     password_generator::PasswordGenerationError,
     paths::get_encrypted_file_path,
     tests::helpers::create_temp_plaintext_file,
+    password_generator::prompt_user_password
 };
 
 fn make_encrypted_file(content: &str) -> String {
@@ -326,7 +320,7 @@ fn test_handle_update() {
         let _ = encrypt_file(file_path.path().to_str().unwrap(), &pass)
             .expect("Failed to encrypt file");
 
-        let _ = handle_update("github".to_string(), "git".to_string());
+        let _ = update::handle_update("github".to_string(), "git".to_string());
 
         let decrypted_data = decryptor::decrypt_file(
             &get_encrypted_file_path(ENCRYPTED_FILENAME).to_string_lossy(),
@@ -349,7 +343,7 @@ fn test_handle_update_username_not_found() {
         let _ = encrypt_file(file_path.path().to_str().unwrap(), &pass)
             .expect("Failed to encrypt file");
 
-        let _ = handle_update("github".to_string(), "unknown".to_string());
+        let _ = update::handle_update("github".to_string(), "unknown".to_string());
 
         let decrypted_data = decryptor::decrypt_file(
             &get_encrypted_file_path(ENCRYPTED_FILENAME).to_string_lossy(),
@@ -367,7 +361,7 @@ fn test_handle_update_username_not_found() {
 #[googletest::test]
 fn test_handle_update_failure() {
     with_var("TEST_MODE", Some("1"), || {
-        let res = handle_update("github".to_string(), "unknown".to_string());
+        let res = update::handle_update("github".to_string(), "unknown".to_string());
 
         expect_that!(
             res.unwrap_err().to_string(),
@@ -379,9 +373,9 @@ fn test_handle_update_failure() {
 #[googletest::test]
 fn test_generate_strong_password() {
     with_var("TEST_MODE", Some("1"), || {
-        expect_that!(generate_strong_password(true), ok(()));
+        expect_that!(generate::generate_strong_password(true), ok(()));
         expect_that!(
-            generate_strong_password(false)
+            generate::generate_strong_password(false)
                 .unwrap_err()
                 .downcast_ref::<PasswordGenerationError>(),
             some(eq(&PasswordGenerationError::NoChoiceSelected))
@@ -393,7 +387,7 @@ fn test_generate_strong_password() {
 fn test_print_credentials_fail() {
     make_encrypted_file("bank - username: foo, password: bar");
 
-    let res = print_credentials(&["git".to_string()], vec![]);
+    let res = decrypt::print_credentials(&["git".to_string()], vec![]);
 
     expect_that!(res, ok(()))
 }
@@ -402,7 +396,7 @@ fn test_print_credentials_fail() {
 fn test_handle_append_success_nonexisting_acc() {
     with_var("TEST_MODE", Some("1"), || {
         let encrypted_file_path = make_encrypted_file("bank - username: foo, password: bar");
-        let _ = handle_append(&["github".to_string()], &["git".to_string()]);
+        let _ = append::handle_append(&["github".to_string()], &["git".to_string()]);
 
         let data = decrypt_file(&encrypted_file_path, &prompt_user_password()).unwrap();
 
@@ -423,7 +417,7 @@ fn test_handle_append_success_existing_acc_pass_update() {
         || {
             let encrypted_file_path =
                 make_encrypted_file("bank - username: foo, password: willbechanged");
-            let _ = handle_append(&["bank".to_string()], &["foo".to_string()]);
+            let _ = append::handle_append(&["bank".to_string()], &["foo".to_string()]);
 
             let data = decrypt_file(&encrypted_file_path, &prompt_user_password()).unwrap();
 
@@ -438,10 +432,10 @@ fn test_handle_append_success_existing_acc_pass_update() {
 #[googletest::test]
 fn test_confirm_interactive_pass_mode() {
     with_var("TEST_PASSWORD_INTERACTIVE", Some("no"), || {
-        expect_that!(confirm_interactive_pass_mode().unwrap(), eq("no"));
+        expect_that!(util::confirm_interactive_pass_mode().unwrap(), eq("no"));
     });
 
     with_var("TEST_PASSWORD_INTERACTIVE", Some("yes"), || {
-        expect_that!(confirm_interactive_pass_mode().unwrap(), eq("yes"));
+        expect_that!(util::confirm_interactive_pass_mode().unwrap(), eq("yes"));
     });
 }
