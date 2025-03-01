@@ -60,6 +60,11 @@ pub enum Commands {
         #[arg(short = 'p', long = "password", default_value_t = false)]
         generate_flag: bool,
     },
+
+    Find {
+        #[arg(short='a', long="account", required = true)]
+        account: String
+    }
 }
 
 pub fn run(cli: Cli) -> Result<()> {

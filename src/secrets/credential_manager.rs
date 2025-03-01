@@ -30,6 +30,16 @@ impl CredentialManager {
             .get_mut(&(account.to_string(), username.to_string()))
     }
 
+    pub fn find_all_by_account(&self, account: &str) -> Vec<String> {
+        self.credentials.keys().filter_map(|(a, _)| {
+            if a.to_lowercase().contains(&account.to_lowercase()) {
+                Some(a.to_string())
+            } else {
+                None
+            }
+        }).collect()
+    }
+
     pub fn save_credentials(&self) -> Result<(), FileError> {
         let updated_data: String = self
             .credentials

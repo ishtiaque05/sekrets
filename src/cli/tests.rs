@@ -440,3 +440,44 @@ fn test_confirm_interactive_pass_mode() {
         expect_that!(util::confirm_interactive_pass_mode().unwrap(), eq("yes"));
     });
 }
+
+#[googletest::test]
+fn find_account_cmd() {
+    expect_that!(
+        Cli::parse_from(vec![
+            "sekrets",
+            "find",
+            "--account",
+            "foo"
+        ])
+        .command,
+        eq(&Commands::Find {
+            account: "foo".to_string(),
+        })
+    );
+}
+
+#[googletest::test]
+fn find_account_cmd_err() {
+
+    let result = Cli::try_parse_from(vec![
+        "sekrets",
+        "find",
+    ]);
+
+    expect_pred!(result.is_err());
+    expect_that!(
+        result.unwrap_err().to_string(),
+        contains_substring("the following required arguments were not provided:\n  --account <ACCOUNT>")
+    );
+}
+
+#[googletest::test]
+fn find_account_cmd_success() {
+    with_var("TEST_MODE", Some("1"), || {
+        let _ = make_encrypted_file("bank - username: foo, password: bar");
+        let res = find::account("foo".to_string());
+
+        expect_pred!(res.is_ok())
+    });
+}
