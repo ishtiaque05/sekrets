@@ -22,7 +22,7 @@ pub fn handle_decrypt(accounts: &[String], usernames: &[String]) -> Result<()> {
 
 pub fn print_credentials(accounts: &[String], usernames: Vec<Option<String>>) -> Result<()> {
     let master_pass = prompt_user_password();
-    let mut cred_manager = CredentialManager::new(master_pass)?;
+    let cred_manager = CredentialManager::new(master_pass)?;
 
     for (account, username) in accounts.iter().zip(usernames.iter()) {
         match cred_manager.find_any_creds_with(username.clone(), account.to_string()) {

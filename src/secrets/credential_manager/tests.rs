@@ -109,7 +109,7 @@ fn test_successful_credential_parsing() {
     let account = "my_account".to_string();
 
     let _ = make_encrypted_file("my_account - username: user123, password: pass456\nanother_account - username: other, password: secret");
-    let mut credential = CredentialManager::new(prompt_user_password()).expect("not to fail");
+    let credential = CredentialManager::new(prompt_user_password()).expect("not to fail");
     let result = credential.find_any_creds_with(None, account.clone());
 
     expect_that!(
@@ -127,7 +127,7 @@ fn test_account_not_found() {
     let account = "unknown_account".to_string();
 
     let _ = make_encrypted_file("my_account - username: user123, password: pass456");
-    let mut credential = CredentialManager::new(prompt_user_password()).expect("not to fail");
+    let credential = CredentialManager::new(prompt_user_password()).expect("not to fail");
     let result = credential.find_any_creds_with(None, account.clone());
 
     expect_that!(
@@ -141,7 +141,7 @@ fn test_malformed_credentials() {
     let account = "my_account".to_string();
 
     let _ = make_encrypted_file("my_account - username user123, password pass456");
-    let mut credential = CredentialManager::new(prompt_user_password()).expect("not to fail");
+    let credential = CredentialManager::new(prompt_user_password()).expect("not to fail");
     let result = credential.find_any_creds_with(None, account.clone());
 
     expect_that!(
@@ -160,7 +160,7 @@ fn test_multiple_accounts() {
                 account3 - username: user3, password: pass3";
 
     let _ = make_encrypted_file(data);
-    let mut credential = CredentialManager::new(prompt_user_password()).expect("not to fail");
+    let credential = CredentialManager::new(prompt_user_password()).expect("not to fail");
     let result = credential.find_any_creds_with(None, account.clone());
 
     expect_pred!(result.is_ok());
@@ -192,7 +192,7 @@ fn test_username_account_match() {
                 account3 - username: user3, password: pass3";
 
     let _ = make_encrypted_file(data);
-    let mut credential = CredentialManager::new(prompt_user_password()).expect("not to fail");
+    let credential = CredentialManager::new(prompt_user_password()).expect("not to fail");
     let result = credential.find_any_creds_with(Some("user2".to_string()), account.clone());
 
     expect_pred!(result.is_ok());
@@ -218,7 +218,7 @@ fn test_username_doesnot_match() {
                 account3 - username: user3, password: pass3";
 
     let _ = make_encrypted_file(data);
-    let mut credential = CredentialManager::new(prompt_user_password()).expect("not to fail");
+    let credential = CredentialManager::new(prompt_user_password()).expect("not to fail");
     let result = credential.find_any_creds_with(Some("foo".to_string()), account.clone());
 
     expect_that!(

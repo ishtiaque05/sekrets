@@ -33,12 +33,12 @@ impl CredentialManager {
     }
 
     pub fn find_any_creds_with(
-        &mut self,
+        &self,
         username: Option<String>,
         account: String,
     ) -> Result<Vec<Credential>, CredentialError> {
         if let Some(ref uname) = username {
-            if let Some(credential) = self.find_creds(&account, uname) {
+            if let Some(credential) = self.credentials.get(&(account.clone(), uname.clone())) {
                 return Ok(vec![credential.clone()]);
             } else {
                 return Err(CredentialError::AccountWithUsernameNotFound(
@@ -50,11 +50,10 @@ impl CredentialManager {
 
         let matching_credentials: Vec<Credential> = self
             .credentials
-            .clone()
-            .into_iter()
+            .iter()
             .filter_map(|((acct, _), credential)| {
-                if acct == account {
-                    Some(credential)
+                if acct == &account {
+                    Some(credential.clone())
                 } else {
                     None
                 }
