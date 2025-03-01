@@ -316,12 +316,16 @@ fn test_run_append_no_encrypted_file() {
 #[googletest::test]
 fn test_handle_update() {
     with_var("TEST_MODE", Some("1"), || {
-        let file_path = create_temp_plaintext_file("github - username: git, password: change_me");
         let pass = prompt_user_password();
-        let _ = encrypt_file(file_path.path().to_str().unwrap(), &pass)
-            .expect("Failed to encrypt file");
-
-        let _ = update::handle_update("github".to_string(), "git".to_string());
+        let _ = make_encrypted_file("github - username: git, password: change_me");
+        let _ = run(Cli::parse_from(vec![
+            "sekrets",
+            "update",
+            "--account",
+            "github",
+            "--username",
+            "git",
+        ]));
 
         let decrypted_data = decryptor::decrypt_file(
             &get_encrypted_file_path(ENCRYPTED_FILENAME).to_string_lossy(),
@@ -438,5 +442,38 @@ fn test_confirm_interactive_pass_mode() {
 
     with_var("TEST_PASSWORD_INTERACTIVE", Some("yes"), || {
         expect_that!(util::confirm_interactive_pass_mode().unwrap(), eq("yes"));
+    });
+}
+
+#[googletest::test]
+fn find_account_cmd() {
+    expect_that!(
+        Cli::parse_from(vec!["sekrets", "find", "--account", "foo"]).command,
+        eq(&Commands::Find {
+            account: "foo".to_string(),
+        })
+    );
+}
+
+#[googletest::test]
+fn find_account_cmd_err() {
+    let result = Cli::try_parse_from(vec!["sekrets", "find"]);
+
+    expect_pred!(result.is_err());
+    expect_that!(
+        result.unwrap_err().to_string(),
+        contains_substring(
+            "the following required arguments were not provided:\n  --account <ACCOUNT>"
+        )
+    );
+}
+
+#[googletest::test]
+fn find_account_cmd_success() {
+    with_var("TEST_MODE", Some("1"), || {
+        let _ = make_encrypted_file("bank - username: foo, password: bar");
+        let res = run(Cli::parse_from(vec!["sekrets", "find", "--account", "foo"]));
+
+        expect_pred!(res.is_ok())
     });
 }

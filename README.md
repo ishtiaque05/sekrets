@@ -11,6 +11,7 @@ For detailed usage instructions, refer to the [Usage Guide](./docs/USAGE.md).
 - 🔄 Update existing credentials securely.
 - 📋 Copy encrypted files to a new location.
 - 🔢 Generate strong passwords for credentials.
+- 🔍 Find account name.
 
 # Security Considerations
 
