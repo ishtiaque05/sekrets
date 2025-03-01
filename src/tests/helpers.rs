@@ -1,7 +1,9 @@
 use std::fs::File;
 use std::io::Write;
-#[cfg(test)]
 use tempfile::NamedTempFile;
+
+use crate::encryption::encryptor::encrypt_file;
+use crate::secrets::password_generator::prompt_user_password;
 
 pub fn create_temp_plaintext_file(content: &str) -> NamedTempFile {
     let temp_file = NamedTempFile::new().expect("Failed to create temp file");
@@ -13,4 +15,11 @@ pub fn create_temp_plaintext_file(content: &str) -> NamedTempFile {
     file.flush().expect("Failed to flush file");
 
     temp_file
+}
+
+pub fn make_encrypted_file(content: &str) -> String {
+    let file_path = create_temp_plaintext_file(content);
+
+    let pass = prompt_user_password();
+    encrypt_file(file_path.path().to_str().unwrap(), &pass).expect("Failed to encrypt file")
 }

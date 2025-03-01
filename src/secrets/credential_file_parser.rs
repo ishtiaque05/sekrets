@@ -4,16 +4,6 @@ use crate::secrets::credentials::Credential;
 
 pub type CredentialHashMap = HashMap<(String, String), Credential>;
 
-#[derive(Debug, thiserror::Error)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
-pub enum ParsingError {
-    #[error("No credentials found for account: `{0}'")]
-    AccountNotFound(String),
-
-    #[error("No credentials found for account: `{0}' with username: `{1}'")]
-    AccountWithUsernameNotFound(String, String),
-}
-
 #[derive(Debug, Default)]
 pub struct CredentialFileParser {
     pub decrypted_data: String,
@@ -22,42 +12,6 @@ pub struct CredentialFileParser {
 impl CredentialFileParser {
     pub fn new(decrypted_data: String) -> Self {
         Self { decrypted_data }
-    }
-
-    pub fn get_credentials(
-        &self,
-        username: Option<String>,
-        account: String,
-    ) -> Result<Vec<Credential>, ParsingError> {
-        let credentials_map = self.get_all_credentials(); // Get all credentials as HashMap
-
-        if let Some(ref uname) = username {
-            if let Some(credential) = credentials_map.get(&(account.clone(), uname.clone())) {
-                return Ok(vec![credential.clone()]);
-            } else {
-                return Err(ParsingError::AccountWithUsernameNotFound(
-                    account,
-                    uname.clone(),
-                ));
-            }
-        }
-
-        let matching_credentials: Vec<Credential> = credentials_map
-            .into_iter()
-            .filter_map(|((acct, _), credential)| {
-                if acct == account {
-                    Some(credential)
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        if matching_credentials.is_empty() {
-            return Err(ParsingError::AccountNotFound(account));
-        }
-
-        Ok(matching_credentials)
     }
 
     pub fn get_all_credentials(&self) -> CredentialHashMap {

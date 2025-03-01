@@ -12,15 +12,8 @@ use crate::{
     },
     helpers::directories::get_encrypted_file_path,
     secrets::password_generator::{prompt_user_password, PasswordGenerationError},
-    tests::helpers::create_temp_plaintext_file,
+    tests::helpers::{create_temp_plaintext_file, make_encrypted_file},
 };
-
-fn make_encrypted_file(content: &str) -> String {
-    let file_path = create_temp_plaintext_file(content);
-
-    let pass = prompt_user_password();
-    encrypt_file(file_path.path().to_str().unwrap(), &pass).expect("Failed to encrypt file")
-}
 
 #[googletest::test]
 fn test_cli_encrypt_parsing() {
