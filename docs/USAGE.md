@@ -60,3 +60,15 @@ sekrets generate -p
 - A strong password is generated and displayed.
 
 - This can be used when updating or adding credentials.
+
+## Find Credentials
+
+To find the account name so that you can use the name to decrypt if you ever forgot account name:
+
+```
+sekrets find -a foo
+```
+
+- Displays the number of matches found with substring `foo` (case insensitive)
+
+- If no account name is found, an empty list [] is returned.
