@@ -72,21 +72,34 @@ fn test_save_credentials() {
 }
 
 #[googletest::test]
-fn find_all_by_account_success() {
-
-}#[googletest::test]
+fn find_all_by_account_success() {}
+#[googletest::test]
 fn find_credentials() {
     let manager = CredentialManager {
         master_password: "test".to_string(),
         credentials: HashMap::from([
-            (("account1".to_string(), "username1".to_string()), mock_credential("account1", "username1", "password1")),
-            (("account2".to_string(), "username2".to_string()), mock_credential("account2", "username1", "password2"))
+            (
+                ("account1".to_string(), "username1".to_string()),
+                mock_credential("account1", "username1", "password1"),
+            ),
+            (
+                ("account2".to_string(), "username2".to_string()),
+                mock_credential("account2", "username1", "password2"),
+            ),
         ]),
     };
 
+    expect_that!(
+        manager.find_all_by_account("account1"),
+        eq(&vec!["account1"])
+    );
+    expect_that!(
+        manager.find_all_by_account("acc"),
+        unordered_elements_are!["account1", "account2"]
+    );
 
-    expect_that!(manager.find_all_by_account("account1"), eq(&vec!["account1"]));
-    expect_that!(manager.find_all_by_account("acc"), unordered_elements_are!["account1", "account2"]);
-
-    expect_that!(manager.find_all_by_account("bar"), unordered_elements_are![]);
+    expect_that!(
+        manager.find_all_by_account("bar"),
+        unordered_elements_are![]
+    );
 }

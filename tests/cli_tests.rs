@@ -124,6 +124,9 @@ fn test_sekrets_tool() {
         .stdout(predicate::str::contains("Password updated successfully"));
 
     run_sekrets_command(&["generate", "-p"]).assert().success();
+    run_sekrets_command(&["find", "-a", "foo"])
+        .assert()
+        .success();
 
     TestCleanup::clean();
 }

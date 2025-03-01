@@ -62,9 +62,9 @@ pub enum Commands {
     },
 
     Find {
-        #[arg(short='a', long="account", required = true)]
-        account: String
-    }
+        #[arg(short = 'a', long = "account", required = true)]
+        account: String,
+    },
 }
 
 pub fn run(cli: Cli) -> Result<()> {
