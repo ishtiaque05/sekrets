@@ -1,9 +1,11 @@
 use crate::{
     encryption::{self, decryptor, encryptor},
     helpers::directories::get_encrypted_file_path,
-    secrets::credential_file_parser::{CredentialFileParser, CredentialHashMap},
-    secrets::credentials::Credential,
-    types::FileError,
+    secrets::{
+        credential_file_parser::{CredentialFileParser, CredentialHashMap},
+        credentials::Credential,
+    },
+    types::{CredentialError, FileError},
 };
 
 pub struct CredentialManager {
@@ -28,6 +30,41 @@ impl CredentialManager {
     pub fn find_creds(&mut self, account: &str, username: &str) -> Option<&mut Credential> {
         self.credentials
             .get_mut(&(account.to_string(), username.to_string()))
+    }
+
+    pub fn find_any_creds_with(
+        &self,
+        username: Option<String>,
+        account: String,
+    ) -> Result<Vec<Credential>, CredentialError> {
+        if let Some(ref uname) = username {
+            if let Some(credential) = self.credentials.get(&(account.clone(), uname.clone())) {
+                return Ok(vec![credential.clone()]);
+            } else {
+                return Err(CredentialError::AccountWithUsernameNotFound(
+                    account,
+                    uname.clone(),
+                ));
+            }
+        }
+
+        let matching_credentials: Vec<Credential> = self
+            .credentials
+            .iter()
+            .filter_map(|((acct, _), credential)| {
+                if acct == &account {
+                    Some(credential.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        if matching_credentials.is_empty() {
+            return Err(CredentialError::AccountNotFound(account));
+        }
+
+        Ok(matching_credentials)
     }
 
     pub fn find_all_by_account(&self, account: &str) -> Vec<String> {

@@ -21,3 +21,13 @@ pub enum FileError {
     #[error("Decryption Error: {0}")]
     DecryptionError(String),
 }
+
+#[derive(Debug, thiserror::Error)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+pub enum CredentialError {
+    #[error("No credentials found for account: `{0}'")]
+    AccountNotFound(String),
+
+    #[error("No credentials found for account: `{0}' with username: `{1}'")]
+    AccountWithUsernameNotFound(String, String),
+}
