@@ -24,6 +24,10 @@ Sekrets uses **AES-256-GCM** encryption and **Argon2 password hashing** to ensur
 ## Installation
 Rust must be installed to compile and run Sekrets.
 
+## Uninstallation
+- To uninstall run `sudo apt remove sekrets` if installed via `sudo dpkg -i <SEKRETS>.deb`
+- You can run `make uninstall` from project dir if you installed it locally using `make install`
+
 ##### **1. Install on Ubuntu (Using `.deb` Package)**
 
 You can install Sekrets on Ubuntu using the pre-built `.deb` package.
