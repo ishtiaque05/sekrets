@@ -55,6 +55,12 @@ jobs:
         id: prev_tag
         run: echo "PREV_TAG=$(git describe --tags --abbrev=0 $(git rev-list --tags --skip=1 --max-count=1))" >> $GITHUB_ENV
 
+      - name: Find Source Branch
+        id: branch
+        run: |
+          BRANCH_NAME=$(git branch -r --contains $GITHUB_SHA | grep -v 'HEAD' | head -n 1 | awk '{print $1}' | sed 's/origin\///')
+          echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+
       # Generate the changelog (commit messages between tags)
       - name: Generate Changelog
         id: changelog
@@ -98,6 +104,9 @@ jobs:
           name: "Sekrets ${{ env.LIB_VERSION }}"
           body: |
             🚀 **New release of Sekrets ${{ env.LIB_VERSION }}**! 
+
+            ### 🌿 Release Branch:
+            This release was tagged from the **`${{ env.BRANCH_NAME }}`** branch.
 
             ### 🔄 Changes:
             ${{ env.CHANGELOG }}
