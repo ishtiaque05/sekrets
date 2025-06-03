@@ -6,7 +6,7 @@ Sekrets provides a command-line interface (CLI) to securely encrypt files and st
 ## Encrypt a File
 To encrypt a file:
 ```sh
-sekret encrypt -f secret.txt
+sekrets encrypt -f secret.txt
 ```
 - The encrypted file is stored as sekrets.enc in the appropriate directory.
 - You will be prompted to enter a password for encryption.
@@ -14,7 +14,7 @@ sekret encrypt -f secret.txt
 ## Decrypt Credentials
 
 ```sh
-sekret decrypt -a github
+sekrets decrypt -a github
 ```
 
 - You must enter the same password used for encryption
@@ -24,7 +24,7 @@ sekret decrypt -a github
 
 To add new credentials to the encrypted file:
 ```sh
-sekret append -a github -u myusername -p mypassword
+sekrets append -a github -u myusername -p mypassword
 ```
 
 - This securely appends new credentials to the existing encrypted file.
