@@ -52,7 +52,7 @@ impl CredentialManager {
             .credentials
             .iter()
             .filter_map(|((acct, _), credential)| {
-                if acct == &account {
+                if acct.to_lowercase().contains(&account.to_lowercase()) {
                     Some(credential.clone())
                 } else {
                     None
