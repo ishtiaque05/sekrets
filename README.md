@@ -41,6 +41,13 @@ sekrets --version # to verify installation
 
 More instruction on different ways of installation can be found in the [installation guide](./docs/INSTALLATION.md)
 
+## Uninstallation
+
+##### Ubuntu
+```
+sudo apt purge sekrets
+```
+
 ### Versioning
 
 We rely on https://semver.org/ for this project.
