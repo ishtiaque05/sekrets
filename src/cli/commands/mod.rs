@@ -2,6 +2,7 @@ pub mod append;
 pub mod copy;
 pub mod decrypt;
 pub mod encrypt;
+pub mod export;
 pub mod find;
 pub mod generate;
 pub mod update;
@@ -24,5 +25,6 @@ pub fn handle_command(cmd: Commands) -> Result<()> {
         Commands::Update { account, username } => update::handle_update(account, username),
         Commands::Generate { generate_flag } => generate::generate_strong_password(generate_flag),
         Commands::Find { account } => find::account(account),
+        Commands::Export { output } => export::handle_export(&output),
     }
 }

@@ -65,6 +65,13 @@ pub enum Commands {
         #[arg(short = 'a', long = "account", required = true)]
         account: String,
     },
+
+    /// Export decrypted secrets to a file
+    Export {
+        /// Output file path
+        #[arg(short, long)]
+        output: String,
+    },
 }
 
 pub fn run(cli: Cli) -> Result<()> {
