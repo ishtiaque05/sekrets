@@ -488,7 +488,9 @@ fn test_cli_export_missing_output() {
     expect_pred!(result.is_err());
     expect_that!(
         result.unwrap_err().to_string(),
-        contains_substring("the following required arguments were not provided:\n  --output <OUTPUT>")
+        contains_substring(
+            "the following required arguments were not provided:\n  --output <OUTPUT>"
+        )
     );
 }
 
@@ -509,7 +511,8 @@ fn test_confirm_overwrite_no() {
 #[googletest::test]
 fn test_export_writes_decrypted_file() {
     with_var("TEST_MODE", Some("1"), || {
-        let original_content = "github - username: foo, password: bar\nbank - username: abc, password: efg";
+        let original_content =
+            "github - username: foo, password: bar\nbank - username: abc, password: efg";
         let _ = make_encrypted_file(original_content);
 
         let output_dir = TempDir::new().expect("Failed to create temp dir");
@@ -593,8 +596,7 @@ fn test_export_fails_with_wrong_password() {
             ("USER_TEST_PASS", Some("wrong_password")),
         ],
         || {
-            let file_path =
-                create_temp_plaintext_file("github - username: foo, password: bar");
+            let file_path = create_temp_plaintext_file("github - username: foo, password: bar");
             let _ = encrypt_file(file_path.path().to_str().unwrap(), "correct_password")
                 .expect("Encryption failed");
 
