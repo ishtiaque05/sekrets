@@ -505,3 +505,148 @@ fn test_confirm_overwrite_no() {
         expect_that!(util::confirm_overwrite("/tmp/test.txt"), eq(false));
     });
 }
+
+#[googletest::test]
+fn test_export_writes_decrypted_file() {
+    with_var("TEST_MODE", Some("1"), || {
+        let original_content = "github - username: foo, password: bar\nbank - username: abc, password: efg";
+        let _ = make_encrypted_file(original_content);
+
+        let output_dir = TempDir::new().expect("Failed to create temp dir");
+        let output_path = output_dir.path().join("exported.txt");
+
+        let result = run(Cli::parse_from(vec![
+            "sekrets",
+            "export",
+            "--output",
+            output_path.to_str().unwrap(),
+        ]));
+
+        expect_pred!(result.is_ok());
+        let exported = std::fs::read_to_string(&output_path).expect("Failed to read exported file");
+        expect_that!(exported, eq(original_content));
+    });
+}
+
+#[googletest::test]
+fn test_export_skips_when_overwrite_declined() {
+    with_vars(
+        vec![
+            ("TEST_MODE", Some("1")),
+            ("TEST_CONFIRM_OVERWRITE", Some("no")),
+        ],
+        || {
+            let _ = make_encrypted_file("github - username: foo, password: bar");
+
+            let output_dir = TempDir::new().expect("Failed to create temp dir");
+            let output_path = output_dir.path().join("existing.txt");
+            std::fs::write(&output_path, "original content").expect("Failed to write");
+
+            let result = run(Cli::parse_from(vec![
+                "sekrets",
+                "export",
+                "--output",
+                output_path.to_str().unwrap(),
+            ]));
+
+            expect_pred!(result.is_ok());
+            let content = std::fs::read_to_string(&output_path).expect("Failed to read");
+            expect_that!(content, eq("original content"));
+        },
+    );
+}
+
+#[googletest::test]
+fn test_export_overwrites_when_confirmed() {
+    with_vars(
+        vec![
+            ("TEST_MODE", Some("1")),
+            ("TEST_CONFIRM_OVERWRITE", Some("yes")),
+        ],
+        || {
+            let original_content = "github - username: foo, password: bar";
+            let _ = make_encrypted_file(original_content);
+
+            let output_dir = TempDir::new().expect("Failed to create temp dir");
+            let output_path = output_dir.path().join("existing.txt");
+            std::fs::write(&output_path, "old content").expect("Failed to write");
+
+            let result = run(Cli::parse_from(vec![
+                "sekrets",
+                "export",
+                "--output",
+                output_path.to_str().unwrap(),
+            ]));
+
+            expect_pred!(result.is_ok());
+            let content = std::fs::read_to_string(&output_path).expect("Failed to read");
+            expect_that!(content, eq(original_content));
+        },
+    );
+}
+
+#[googletest::test]
+fn test_export_fails_with_wrong_password() {
+    with_vars(
+        vec![
+            ("TEST_MODE", Some("1")),
+            ("USER_TEST_PASS", Some("wrong_password")),
+        ],
+        || {
+            let file_path =
+                create_temp_plaintext_file("github - username: foo, password: bar");
+            let _ = encrypt_file(file_path.path().to_str().unwrap(), "correct_password")
+                .expect("Encryption failed");
+
+            let output_dir = TempDir::new().expect("Failed to create temp dir");
+            let output_path = output_dir.path().join("exported.txt");
+
+            let result = run(Cli::parse_from(vec![
+                "sekrets",
+                "export",
+                "--output",
+                output_path.to_str().unwrap(),
+            ]));
+
+            expect_pred!(result.is_err());
+            expect_pred!(!output_path.exists());
+        },
+    );
+}
+
+#[googletest::test]
+fn test_export_fails_with_invalid_output_path() {
+    with_var("TEST_MODE", Some("1"), || {
+        let _ = make_encrypted_file("github - username: foo, password: bar");
+
+        let result = run(Cli::parse_from(vec![
+            "sekrets",
+            "export",
+            "--output",
+            "/nonexistent/directory/output.txt",
+        ]));
+
+        expect_pred!(result.is_err());
+    });
+}
+
+#[googletest::test]
+fn test_export_fails_no_encrypted_file() {
+    with_var("TEST_MODE", Some("1"), || {
+        let output_dir = TempDir::new().expect("Failed to create temp dir");
+        let output_path = output_dir.path().join("exported.txt");
+
+        let result = run(Cli::parse_from(vec![
+            "sekrets",
+            "export",
+            "--output",
+            output_path.to_str().unwrap(),
+        ]));
+
+        expect_pred!(result.is_err());
+        expect_that!(
+            result.unwrap_err().to_string(),
+            contains_substring("No such file or directory")
+        );
+    });
+}
