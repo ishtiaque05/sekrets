@@ -470,3 +470,24 @@ fn find_account_cmd_success() {
         expect_pred!(res.is_ok())
     });
 }
+
+#[googletest::test]
+fn test_cli_export_parsing() {
+    expect_that!(
+        Cli::parse_from(vec!["sekrets", "export", "--output", "/tmp/out.txt"]).command,
+        eq(&Commands::Export {
+            output: "/tmp/out.txt".to_string()
+        })
+    );
+}
+
+#[googletest::test]
+fn test_cli_export_missing_output() {
+    let result = Cli::try_parse_from(vec!["sekrets", "export"]);
+
+    expect_pred!(result.is_err());
+    expect_that!(
+        result.unwrap_err().to_string(),
+        contains_substring("the following required arguments were not provided:\n  --output <OUTPUT>")
+    );
+}
