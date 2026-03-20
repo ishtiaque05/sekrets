@@ -491,3 +491,17 @@ fn test_cli_export_missing_output() {
         contains_substring("the following required arguments were not provided:\n  --output <OUTPUT>")
     );
 }
+
+#[googletest::test]
+fn test_confirm_overwrite_yes() {
+    with_var("TEST_CONFIRM_OVERWRITE", Some("yes"), || {
+        expect_that!(util::confirm_overwrite("/tmp/test.txt"), eq(true));
+    });
+}
+
+#[googletest::test]
+fn test_confirm_overwrite_no() {
+    with_var("TEST_CONFIRM_OVERWRITE", Some("no"), || {
+        expect_that!(util::confirm_overwrite("/tmp/test.txt"), eq(false));
+    });
+}
