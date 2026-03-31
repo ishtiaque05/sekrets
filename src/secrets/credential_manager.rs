@@ -81,12 +81,10 @@ impl CredentialManager {
     }
 
     pub fn save_credentials(&self) -> Result<(), FileError> {
-        let updated_data: String = self
-            .credentials
-            .values()
-            .map(|c| c.format_as_str())
-            .collect::<Vec<_>>()
-            .join("\n");
+        let updated_data =
+            crate::secrets::credential_file_parser::CredentialFileParser::serialize_to_jsonl(
+                &self.credentials,
+            );
         let _ = encryptor::encrypt_text(&updated_data, &self.master_password);
 
         Ok(())

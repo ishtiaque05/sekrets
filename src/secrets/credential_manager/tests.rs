@@ -5,6 +5,7 @@ use crate::tests::helpers::make_encrypted_file;
 use crate::{helpers::directories::get_encrypted_file_path, secrets::credentials::Credential};
 use googletest::prelude::*;
 use std::collections::HashMap;
+use serde_json;
 
 fn mock_credential(account: &str, username: &str, password: &str) -> Credential {
     Credential::new(account.to_string(), username.to_string(), password.to_string())
@@ -63,10 +64,41 @@ fn test_save_credentials() {
     )
     .unwrap();
 
-    expect_that!(
-        data,
-        contains_substring("account1 - username: username1, password: password1")
+    expect_that!(data, contains_substring("account1"));
+    expect_that!(data, contains_substring("username1"));
+    expect_that!(data, contains_substring("password1"));
+}
+
+#[googletest::test]
+fn test_save_credentials_jsonl_format() {
+    let mut manager = CredentialManager {
+        master_password: "foo".to_string(),
+        credentials: HashMap::new(),
+    };
+
+    manager.credentials.insert(
+        ("github".to_string(), "user1".to_string()),
+        Credential::new("github".to_string(), "user1".to_string(), "pass1".to_string()),
+    );
+
+    let result = manager.save_credentials();
+    expect_pred!(result.is_ok());
+
+    // Decrypt and verify it's JSONL format
+    let data = decrypt_file(
+        get_encrypted_file_path(ENCRYPTED_FILENAME).to_str().unwrap(),
+        "foo",
     )
+    .unwrap();
+
+    // Should start with '{' (JSONL format)
+    expect_that!(data.trim().starts_with('{'), eq(true));
+
+    // Should parse back correctly
+    let parsed: serde_json::Value = serde_json::from_str(data.trim()).unwrap();
+    expect_that!(parsed["account"].as_str().unwrap(), eq("github"));
+    expect_that!(parsed["username"].as_str().unwrap(), eq("user1"));
+    expect_that!(parsed["password"].as_str().unwrap(), eq("pass1"));
 }
 
 #[googletest::test]

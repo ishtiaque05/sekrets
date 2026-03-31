@@ -252,10 +252,8 @@ fn test_run_append_command() {
         )
         .expect("Failed to decrypt file");
 
-        expect_that!(
-            decrypted_data,
-            contains_substring("bank - username: john_doe")
-        );
+        expect_that!(decrypted_data, contains_substring("bank"));
+        expect_that!(decrypted_data, contains_substring("john_doe"));
     });
 }
 
@@ -326,10 +324,9 @@ fn test_handle_update() {
         )
         .expect("Failed to decrypt file");
 
-        expect_that!(
-            decrypted_data,
-            contains_substring("github - username: git, password: bar")
-        );
+        expect_that!(decrypted_data, contains_substring("github"));
+        expect_that!(decrypted_data, contains_substring("git"));
+        expect_that!(decrypted_data, contains_substring("bar"));
     });
 }
 
@@ -349,10 +346,9 @@ fn test_handle_update_username_not_found() {
         )
         .expect("Failed to decrypt file");
 
-        expect_that!(
-            decrypted_data,
-            contains_substring("github - username: me, password: change_me")
-        );
+        expect_that!(decrypted_data, contains_substring("github"));
+        expect_that!(decrypted_data, contains_substring("me"));
+        expect_that!(decrypted_data, contains_substring("change_me"));
     });
 }
 
@@ -398,10 +394,9 @@ fn test_handle_append_success_nonexisting_acc() {
 
         let data = decrypt_file(&encrypted_file_path, &prompt_user_password()).unwrap();
 
-        expect_that!(
-            data,
-            contains_substring("github - username: git, password: bar")
-        );
+        expect_that!(data, contains_substring("github"));
+        expect_that!(data, contains_substring("git"));
+        expect_that!(data, contains_substring("bar"));
     });
 }
 
@@ -419,10 +414,9 @@ fn test_handle_append_success_existing_acc_pass_update() {
 
             let data = decrypt_file(&encrypted_file_path, &prompt_user_password()).unwrap();
 
-            expect_that!(
-                data,
-                contains_substring("bank - username: foo, password: bar")
-            );
+            expect_that!(data, contains_substring("bank"));
+            expect_that!(data, contains_substring("foo"));
+            expect_that!(data, contains_substring("bar"));
         },
     );
 }
