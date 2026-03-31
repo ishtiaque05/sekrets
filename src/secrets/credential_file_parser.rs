@@ -34,11 +34,7 @@ impl CredentialFileParser {
                 if !account.is_empty() && !username.is_empty() && !password.is_empty() {
                     credentials_map.insert(
                         (account.to_string(), username.to_string()),
-                        Credential {
-                            account: account.to_string(),
-                            username,
-                            password,
-                        },
+                        Credential::new(account.to_string(), username, password),
                     );
                 }
             }

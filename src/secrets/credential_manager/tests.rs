@@ -7,11 +7,7 @@ use googletest::prelude::*;
 use std::collections::HashMap;
 
 fn mock_credential(account: &str, username: &str, password: &str) -> Credential {
-    Credential {
-        account: account.to_string(),
-        username: username.to_string(),
-        password: password.to_string(),
-    }
+    Credential::new(account.to_string(), username.to_string(), password.to_string())
 }
 
 #[googletest::test]
@@ -112,14 +108,12 @@ fn test_successful_credential_parsing() {
     let credential = CredentialManager::new(prompt_user_password()).expect("not to fail");
     let result = credential.find_any_creds_with(None, account.clone());
 
-    expect_that!(
-        result,
-        ok(eq(&vec![Credential {
-            account,
-            username: "user123".to_string(),
-            password: "pass456".to_string()
-        }]))
-    )
+    expect_pred!(result.is_ok());
+    let creds = result.unwrap();
+    expect_pred!(creds.len() == 1);
+    expect_that!(creds[0].account, eq("my_account"));
+    expect_that!(creds[0].username, eq("user123"));
+    expect_that!(creds[0].password, eq("pass456"));
 }
 
 #[googletest::test]
@@ -170,15 +164,15 @@ fn test_multiple_accounts() {
     expect_that!(
         credentials,
         contains_each![
-            eq(&Credential {
-                account: account.clone(),
-                username: "user1".to_string(),
-                password: "pass1".to_string(),
+            matches_pattern!(Credential {
+                account: eq("account"),
+                username: eq("user1"),
+                password: eq("pass1"),
             }),
-            eq(&Credential {
-                account,
-                username: "user2".to_string(),
-                password: "pass2".to_string(),
+            matches_pattern!(Credential {
+                account: eq("account"),
+                username: eq("user2"),
+                password: eq("pass2"),
             }),
         ]
     );
@@ -202,11 +196,11 @@ fn test_username_account_match() {
 
     expect_that!(
         credentials[0],
-        eq(&Credential {
-            account: account.clone(),
-            username: "user2".to_string(),
-            password: "pass2".to_string(),
-        }),
+        matches_pattern!(Credential {
+            account: eq("account"),
+            username: eq("user2"),
+            password: eq("pass2"),
+        })
     );
 }
 

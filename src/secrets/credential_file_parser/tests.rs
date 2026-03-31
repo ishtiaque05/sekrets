@@ -17,14 +17,9 @@ fn test_get_all_credentials() {
         .get(&("account".to_string(), "user2".to_string()))
         .unwrap();
 
-    expect_that!(
-        val,
-        eq(&Credential {
-            account: "account".to_string(),
-            username: "user2".to_string(),
-            password: "pass2".to_string()
-        })
-    )
+    expect_that!(val.account, eq("account"));
+    expect_that!(val.username, eq("user2"));
+    expect_that!(val.password, eq("pass2"));
 }
 
 #[googletest::test]
