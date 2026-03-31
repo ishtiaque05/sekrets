@@ -1,0 +1,7 @@
+name: "CodeQL config for sekrets"
+
+paths-ignore:
+  - "**/tests.rs"
+  - "**/tests/**"
+  - "tests/**"
+  - "src/tests/**"

@@ -109,15 +109,15 @@ impl PasswordGenerator {
             }
         };
 
-        println!("\nGenerated Password: {}", password);
+        eprintln!("\nGenerated Password: {}", password);
 
         match is_password_strong(&password) {
             true => {
-                println!("✅ Your password is strong!");
+                eprintln!("✅ Your password is strong!");
                 Ok(password)
             }
             false => {
-                println!(
+                eprintln!(
                     "⚠️ Warning: Your password is weak. Consider making it longer or more complex."
                 );
                 Err(PasswordGenerationError::IsWeak)
