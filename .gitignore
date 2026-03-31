@@ -3,3 +3,4 @@
 *.dec
 .vscode
 coverage/*
+docs/superpowers/
