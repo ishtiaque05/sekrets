@@ -7,8 +7,12 @@ pub mod commands;
 #[command(author, version, about)]
 #[cfg_attr(test, derive(Debug))]
 pub struct Cli {
+    /// Update sekrets to the latest version
+    #[arg(long = "update", default_value_t = false)]
+    update: bool,
+
     #[command(subcommand)]
-    command: Commands,
+    command: Option<Commands>,
 }
 
 #[derive(Subcommand)]
@@ -99,7 +103,17 @@ pub enum Commands {
 pub fn run(cli: Cli) -> Result<()> {
     crate::helpers::directories::ensure_dirs();
 
-    commands::handle_command(cli.command)
+    if cli.update {
+        return commands::self_update::handle_self_update();
+    }
+
+    match cli.command {
+        Some(cmd) => commands::handle_command(cmd),
+        None => {
+            println!("No command provided. Use --help for usage.");
+            Ok(())
+        }
+    }
 }
 
 #[cfg(test)]

@@ -19,9 +19,9 @@ use crate::{
 fn test_cli_encrypt_parsing() {
     expect_that!(
         Cli::parse_from(vec!["sekrets", "encrypt", "--file", "../fixtures/foo.txt"]).command,
-        eq(&Commands::Encrypt {
+        eq(&Some(Commands::Encrypt {
             file: "../fixtures/foo.txt".to_string()
-        })
+        }))
     );
 }
 
@@ -48,11 +48,11 @@ fn test_cli_decrypt_parsing() {
             "bank"
         ])
         .command,
-        eq(&Commands::Decrypt {
+        eq(&Some(Commands::Decrypt {
             accounts: vec!["github".to_string(), "bank".to_string()],
             usernames: vec![],
             history: false,
-        })
+        }))
     );
 }
 
@@ -72,11 +72,11 @@ fn test_cli_decrypt_parsing_with_username() {
             "bar"
         ])
         .command,
-        eq(&Commands::Decrypt {
+        eq(&Some(Commands::Decrypt {
             accounts: vec!["github".to_string(), "bank".to_string()],
             usernames: vec!["foo".to_string(), "bar".to_string()],
             history: false,
-        })
+        }))
     );
 }
 
@@ -92,10 +92,10 @@ fn test_cli_update_creds() {
             "foo"
         ])
         .command,
-        eq(&Commands::Update {
+        eq(&Some(Commands::Update {
             account: "github".to_string(),
             username: "foo".to_string()
-        })
+        }))
     );
 }
 
@@ -103,9 +103,9 @@ fn test_cli_update_creds() {
 fn test_cli_password_generate() {
     expect_that!(
         Cli::parse_from(vec!["sekrets", "generate", "-p"]).command,
-        eq(&Commands::Generate {
+        eq(&Some(Commands::Generate {
             generate_flag: true
-        })
+        }))
     );
 }
 
@@ -438,9 +438,9 @@ fn test_confirm_interactive_pass_mode() {
 fn find_account_cmd() {
     expect_that!(
         Cli::parse_from(vec!["sekrets", "find", "--account", "foo"]).command,
-        eq(&Commands::Find {
+        eq(&Some(Commands::Find {
             account: "foo".to_string(),
-        })
+        }))
     );
 }
 
@@ -471,9 +471,9 @@ fn find_account_cmd_success() {
 fn test_cli_export_parsing() {
     expect_that!(
         Cli::parse_from(vec!["sekrets", "export", "--output", "/tmp/out.txt"]).command,
-        eq(&Commands::Export {
+        eq(&Some(Commands::Export {
             output: "/tmp/out.txt".to_string()
-        })
+        }))
     );
 }
 

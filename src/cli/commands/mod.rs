@@ -6,6 +6,7 @@ pub mod export;
 pub mod find;
 pub mod generate;
 pub mod import;
+pub mod self_update;
 pub mod update;
 pub mod util;
 pub mod version;
