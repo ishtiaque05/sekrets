@@ -133,6 +133,9 @@ fn download_asset(url: &str) -> Result<Vec<u8>> {
         .build()?;
 
     let response = client.get(url).send()?;
+    let response = response
+        .error_for_status()
+        .map_err(|e| anyhow::anyhow!("Download failed: {}", e))?;
     let bytes = response.bytes()?;
     Ok(bytes.to_vec())
 }
@@ -152,7 +155,7 @@ fn is_path_writable(path: &std::path::Path) -> bool {
     }
 }
 
-fn install_update(archive_data: &[u8], target_path: &PathBuf, asset_name: &str) -> Result<()> {
+fn install_update(archive_data: &[u8], target_path: &std::path::Path, asset_name: &str) -> Result<()> {
     let temp_dir = tempfile::tempdir()?;
 
     if asset_name.ends_with(".tar.gz") {
@@ -161,24 +164,33 @@ fn install_update(archive_data: &[u8], target_path: &PathBuf, asset_name: &str) 
         let mut archive = tar::Archive::new(decoder);
         archive.unpack(temp_dir.path())?;
 
-        // Find the sekrets binary in the extracted files
         let binary_path = find_binary_in_dir(temp_dir.path())?;
 
-        // Atomic-ish replace: rename old, copy new, remove old
         let backup_path = target_path.with_extension("old");
         if target_path.exists() {
             fs::rename(target_path, &backup_path)?;
         }
-        fs::copy(&binary_path, target_path)?;
 
-        // Set executable permissions
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(target_path, fs::Permissions::from_mode(0o755))?;
+        // Copy new binary and set permissions; rollback on failure
+        let install_result = (|| -> Result<()> {
+            fs::copy(&binary_path, target_path)?;
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                fs::set_permissions(target_path, fs::Permissions::from_mode(0o755))?;
+            }
+            Ok(())
+        })();
+
+        if let Err(e) = install_result {
+            // Rollback: restore backup
+            if backup_path.exists() {
+                let _ = fs::rename(&backup_path, target_path);
+            }
+            return Err(e);
         }
 
-        // Clean up backup
+        // Clean up backup only after success
         let _ = fs::remove_file(&backup_path);
     } else {
         return Err(anyhow::anyhow!(

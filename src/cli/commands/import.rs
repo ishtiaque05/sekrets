@@ -19,7 +19,7 @@ pub fn handle_import(file: &str) -> Result<()> {
     // Prompt for current master password (if existing file)
     let current_password = if has_existing {
         println!("Enter your current master password:");
-        let pass = prompt_password()?;
+        let pass = super::util::prompt_password()?;
 
         // Validate by attempting to decrypt
         let current_path_str = current_enc_path.to_string_lossy().to_string();
@@ -33,7 +33,7 @@ pub fn handle_import(file: &str) -> Result<()> {
 
     // Prompt for import file password
     println!("Enter the password for the import file:");
-    let import_password = prompt_password()?;
+    let import_password = super::util::prompt_password()?;
 
     // Decrypt and validate import file
     let import_data = decryptor::decrypt_file(file, &import_password)
@@ -80,13 +80,3 @@ pub fn handle_import(file: &str) -> Result<()> {
     Ok(())
 }
 
-fn prompt_password() -> Result<String> {
-    if std::env::var("TEST_MODE").is_ok() || cfg!(test) {
-        Ok(std::env::var("USER_TEST_PASS").unwrap_or_else(|_| "foo".to_string()))
-    } else {
-        use rpassword::read_password;
-        use std::io::Write;
-        std::io::stdout().flush()?;
-        Ok(read_password().expect("Failed to read password"))
-    }
-}

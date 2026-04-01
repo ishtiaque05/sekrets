@@ -47,27 +47,24 @@ fn switch_version(n: usize) -> Result<()> {
         return Err(anyhow::anyhow!("Version v{} does not exist", n));
     }
 
-    let current_path = get_encrypted_file_path(encryptor::ENCRYPTED_FILENAME);
+    // Validate passwords BEFORE any destructive operations
+    println!("Enter the password for version v{}:", n);
+    let version_password = super::util::prompt_password()?;
 
-    // Snapshot current before switching
+    let version_data =
+        decryptor::decrypt_file(version_path.to_string_lossy().as_ref(), &version_password)
+            .map_err(|_| anyhow::anyhow!("Failed to decrypt version v{}. Wrong password?", n))?;
+
+    println!("Enter your current master password (to re-encrypt):");
+    let current_password = super::util::prompt_password()?;
+
+    // Snapshot current AFTER validation succeeds
+    let current_path = get_encrypted_file_path(encryptor::ENCRYPTED_FILENAME);
     if current_path.exists() {
         println!("Backing up current file...");
         version_manager::snapshot_current(&current_path)
             .map_err(|e| anyhow::anyhow!("Failed to snapshot current file: {}", e))?;
     }
-
-    // Prompt for the version file's password
-    println!("Enter the password for version v{}:", n);
-    let version_password = prompt_password()?;
-
-    // Validate by decrypting
-    let version_data =
-        decryptor::decrypt_file(version_path.to_string_lossy().as_ref(), &version_password)
-            .map_err(|_| anyhow::anyhow!("Failed to decrypt version v{}. Wrong password?", n))?;
-
-    // Prompt for current master password to re-encrypt
-    println!("Enter your current master password (to re-encrypt):");
-    let current_password = prompt_password()?;
 
     // Re-encrypt with current password
     encryptor::encrypt_text(&version_data, &current_password)
@@ -78,13 +75,3 @@ fn switch_version(n: usize) -> Result<()> {
     Ok(())
 }
 
-fn prompt_password() -> Result<String> {
-    if std::env::var("TEST_MODE").is_ok() || cfg!(test) {
-        Ok(std::env::var("USER_TEST_PASS").unwrap_or_else(|_| "foo".to_string()))
-    } else {
-        use rpassword::read_password;
-        use std::io::Write;
-        std::io::stdout().flush()?;
-        Ok(read_password().expect("Failed to read password"))
-    }
-}

@@ -1,6 +1,19 @@
 use crate::secrets::credential_manager::CredentialManager;
 use anyhow::Result;
 
+/// Prompt for a password, returning the entered string.
+/// In test mode, reads from USER_TEST_PASS env var or defaults to "foo".
+pub fn prompt_password() -> Result<String> {
+    if std::env::var("TEST_MODE").is_ok() || cfg!(test) {
+        Ok(std::env::var("USER_TEST_PASS").unwrap_or_else(|_| "foo".to_string()))
+    } else {
+        use rpassword::read_password;
+        use std::io::Write;
+        std::io::stdout().flush()?;
+        Ok(read_password()?)
+    }
+}
+
 /// Check if migration is needed and prompt user.
 /// Returns Ok(true) if migration was performed, Ok(false) if not needed.
 pub fn check_and_migrate(manager: &CredentialManager) -> Result<bool> {
@@ -11,7 +24,7 @@ pub fn check_and_migrate(manager: &CredentialManager) -> Result<bool> {
     println!("Your sekrets file uses an older format. It will be upgraded to the new format.");
     println!("A backup of your current file will be saved before migrating.");
     print!("Proceed? (y/n): ");
-    std::io::Write::flush(&mut std::io::stdout()).unwrap();
+    std::io::Write::flush(&mut std::io::stdout())?;
 
     let response = if std::env::var("TEST_MODE").is_ok() || cfg!(test) {
         "y".to_string()

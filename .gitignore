@@ -4,3 +4,4 @@
 .vscode
 coverage/*
 docs/superpowers/
+tmp/

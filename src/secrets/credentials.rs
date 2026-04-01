@@ -9,6 +9,18 @@ pub struct HistoryEntry {
     pub ts: String,
 }
 
+impl HistoryEntry {
+    pub fn format_ts_local(&self) -> String {
+        use chrono::{DateTime, Local};
+        if let Ok(utc) = self.ts.parse::<DateTime<Utc>>() {
+            let local: DateTime<Local> = utc.into();
+            local.format("%Y-%m-%d %I:%M %p %Z").to_string()
+        } else {
+            self.ts.clone()
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]
 pub struct Credential {
     pub account: String,

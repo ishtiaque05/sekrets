@@ -7,14 +7,14 @@ use crate::secrets::{
 pub fn handle_decrypt(accounts: &[String], usernames: &[String], history: bool) -> Result<()> {
     if usernames.is_empty() {
         let unames = vec![None; accounts.len()];
-        print_credentials(accounts, unames, history).expect("to print credentials");
+        print_credentials(accounts, unames, history)?;
     } else {
         if accounts.len() != usernames.len() {
             return Err(anyhow::anyhow!("Mismatched accounts and usernames"));
         }
 
         let some_usernames = usernames.iter().map(|s| Some(s.clone())).collect();
-        print_credentials(accounts, some_usernames, history).expect("to print credentials");
+        print_credentials(accounts, some_usernames, history)?;
     }
 
     Ok(())
@@ -42,16 +42,7 @@ pub fn print_credentials(
                     if show_history {
                         println!("  current:  ********     ({})", cred.format_ts_local());
                         for (i, entry) in cred.history.iter().enumerate() {
-                            let local_ts = {
-                                use chrono::{DateTime, Local, Utc};
-                                if let Ok(utc) = entry.ts.parse::<DateTime<Utc>>() {
-                                    let local: DateTime<Local> = utc.into();
-                                    local.format("%Y-%m-%d %I:%M %p %Z").to_string()
-                                } else {
-                                    entry.ts.clone()
-                                }
-                            };
-                            println!("  v{}:       ********     ({})", i + 1, local_ts);
+                            println!("  v{}:       ********     ({})", i + 1, entry.format_ts_local());
                         }
                     }
                 }

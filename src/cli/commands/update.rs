@@ -18,10 +18,15 @@ pub fn handle_update(account: String, username: String) -> Result<()> {
         let new_password = PasswordGenerator::interactive_mode()?;
 
         cred.update_pass(new_password);
+        credential_manager.save_credentials()?;
+        println!("Password updated successfully!");
+    } else {
+        return Err(anyhow::anyhow!(
+            "No credentials found for account: `{}` with username: `{}`",
+            account,
+            username
+        ));
     }
-
-    credential_manager.save_credentials()?;
-    println!("✅ Password updated successfully!");
 
     Ok(())
 }

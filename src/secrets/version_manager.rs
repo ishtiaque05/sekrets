@@ -22,11 +22,18 @@ pub fn get_version_file_path(n: usize) -> PathBuf {
 pub fn snapshot_current(current_file: &std::path::Path) -> Result<()> {
     let versions_dir = get_versions_path();
 
-    // Count existing versions
-    let existing_count = count_existing_versions(&versions_dir);
+    // Find the lowest unused slot
+    let next_slot = (1..=MAX_VERSIONS)
+        .find(|i| !versions_dir.join(format!("sekrets.v{}.enc", i)).exists());
 
-    if existing_count >= MAX_VERSIONS {
-        // Rotate: delete v1, shift everything down
+    if let Some(slot) = next_slot {
+        // Empty slot available — use it directly
+        fs::copy(
+            current_file,
+            versions_dir.join(format!("sekrets.v{}.enc", slot)),
+        )?;
+    } else {
+        // All slots full — rotate: delete v1, shift everything down, save as v5
         let v1 = versions_dir.join("sekrets.v1.enc");
         if v1.exists() {
             fs::remove_file(&v1)?;
@@ -40,17 +47,9 @@ pub fn snapshot_current(current_file: &std::path::Path) -> Result<()> {
             }
         }
 
-        // Save current as v5
         fs::copy(
             current_file,
             versions_dir.join(format!("sekrets.v{}.enc", MAX_VERSIONS)),
-        )?;
-    } else {
-        // Save as next available slot
-        let next = existing_count + 1;
-        fs::copy(
-            current_file,
-            versions_dir.join(format!("sekrets.v{}.enc", next)),
         )?;
     }
 
@@ -77,12 +76,6 @@ pub fn list_versions() -> Result<Vec<VersionInfo>> {
 
     versions.sort_by_key(|v| v.number);
     Ok(versions)
-}
-
-fn count_existing_versions(versions_dir: &std::path::Path) -> usize {
-    (1..=MAX_VERSIONS)
-        .filter(|i| versions_dir.join(format!("sekrets.v{}.enc", i)).exists())
-        .count()
 }
 
 #[cfg(test)]
