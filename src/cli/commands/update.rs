@@ -7,6 +7,7 @@ use anyhow::Result;
 pub fn handle_update(account: String, username: String) -> Result<()> {
     let password = prompt_user_password();
     let mut credential_manager = CredentialManager::new(password)?;
+    crate::cli::commands::util::check_and_migrate(&credential_manager)?;
 
     if let Some(cred) = credential_manager.find_creds(&account, &username) {
         println!(

@@ -27,6 +27,7 @@ pub fn handle_append(accounts: &[String], usernames: &[String]) -> Result<()> {
     }
 
     let mut credential_manager = CredentialManager::new(master_pass.clone())?;
+    crate::cli::commands::util::check_and_migrate(&credential_manager)?;
 
     for (account, username) in accounts.iter().zip(usernames.iter()) {
         let key = (account.clone(), username.clone());
