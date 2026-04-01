@@ -3,10 +3,6 @@ use crate::helpers::directories::get_versions_path;
 use googletest::prelude::*;
 use std::fs;
 
-fn write_dummy_version(path: &std::path::Path) {
-    fs::write(path, "dummy encrypted content").unwrap();
-}
-
 #[googletest::test]
 fn test_snapshot_creates_v1_when_no_versions() {
     let versions_dir = get_versions_path();
