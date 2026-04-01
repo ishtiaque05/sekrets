@@ -1,7 +1,7 @@
 use super::*;
 use crate::encryption::{decryptor::decrypt_file, encryptor::ENCRYPTED_FILENAME};
 use crate::secrets::password_generator::prompt_user_password;
-use crate::tests::helpers::make_encrypted_file;
+use crate::tests::helpers::{make_encrypted_file, make_encrypted_jsonl_file};
 use crate::{helpers::directories::get_encrypted_file_path, secrets::credentials::Credential};
 use googletest::prelude::*;
 use std::collections::HashMap;
@@ -16,6 +16,7 @@ fn test_find_creds_success() {
     let mut manager = CredentialManager {
         master_password: "test".to_string(),
         credentials: HashMap::new(),
+        needs_migration: false,
     };
 
     manager.credentials.insert(
@@ -34,6 +35,7 @@ fn test_find_creds_not_found() {
     let mut manager = CredentialManager {
         master_password: "test".to_string(),
         credentials: HashMap::new(),
+        needs_migration: false,
     };
 
     let cred = manager.find_creds("nonexistent_account", "nonexistent_user");
@@ -46,6 +48,7 @@ fn test_save_credentials() {
     let mut manager = CredentialManager {
         master_password: "foo".to_string(),
         credentials: HashMap::new(),
+        needs_migration: false,
     };
 
     manager.credentials.insert(
@@ -74,6 +77,7 @@ fn test_save_credentials_jsonl_format() {
     let mut manager = CredentialManager {
         master_password: "foo".to_string(),
         credentials: HashMap::new(),
+        needs_migration: false,
     };
 
     manager.credentials.insert(
@@ -115,6 +119,7 @@ fn find_credentials() {
                 mock_credential("account2", "username1", "password2"),
             ),
         ]),
+        needs_migration: false,
     };
 
     expect_that!(
@@ -253,4 +258,28 @@ fn test_username_doesnot_match() {
             CredentialError::AccountWithUsernameNotFound(eq("account"), eq("foo"))
         ))
     );
+}
+
+#[googletest::test]
+fn test_loading_legacy_format_triggers_migration_flag() {
+    let data = "github - username: foo, password: bar\nbank - username: baz, password: secret";
+    let _ = make_encrypted_file(data);
+
+    let manager = CredentialManager::new(prompt_user_password()).expect("not to fail");
+
+    expect_that!(manager.credentials.len(), eq(2));
+    expect_that!(manager.needs_migration, eq(true));
+}
+
+#[googletest::test]
+fn test_loading_jsonl_format_no_migration() {
+    let creds = vec![
+        Credential::new("github".to_string(), "foo".to_string(), "bar".to_string()),
+    ];
+    let _ = make_encrypted_jsonl_file(&creds);
+
+    let manager = CredentialManager::new(prompt_user_password()).expect("not to fail");
+
+    expect_that!(manager.credentials.len(), eq(1));
+    expect_that!(manager.needs_migration, eq(false));
 }
