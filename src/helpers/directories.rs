@@ -28,13 +28,9 @@ pub fn get_data_path() -> PathBuf {
 
 #[cfg(not(test))]
 pub fn get_encrypted_file_path(file_name: &str) -> PathBuf {
-    if std::env::var("TEST_MODE").is_ok() {
-        let temp_dir = std::env::current_dir()
-            .expect("Failed to get current directory")
-            .join("tmp/sekrets_test");
-
+    if let Ok(test_dir) = std::env::var("SEKRETS_TEST_DIR") {
+        let temp_dir = PathBuf::from(test_dir);
         fs::create_dir_all(&temp_dir).expect("Failed to create test temp directory");
-
         temp_dir.join(file_name)
     } else {
         let mut path = get_data_path();
@@ -58,6 +54,28 @@ pub fn get_encrypted_file_path(file_name: &str) -> PathBuf {
     fs::create_dir_all(&encrypted_dir).expect("Failed to create encrypted directory");
 
     encrypted_dir.join(file_name)
+}
+
+#[cfg(not(test))]
+pub fn get_versions_path() -> PathBuf {
+    if let Ok(test_dir) = std::env::var("SEKRETS_TEST_DIR") {
+        let versions_dir = PathBuf::from(test_dir).join("versions");
+        fs::create_dir_all(&versions_dir).expect("Failed to create test versions directory");
+        versions_dir
+    } else {
+        let mut path = get_data_path();
+        path.push("versions");
+        fs::create_dir_all(&path).expect("Failed to create versions directory");
+        path
+    }
+}
+
+#[cfg(test)]
+pub fn get_versions_path() -> PathBuf {
+    let temp_dir = get_test_temp_dir();
+    let versions_dir = temp_dir.join("versions");
+    fs::create_dir_all(&versions_dir).expect("Failed to create versions directory");
+    versions_dir
 }
 
 pub fn ensure_dirs() {

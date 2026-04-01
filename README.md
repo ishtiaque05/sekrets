@@ -12,6 +12,10 @@ For detailed usage instructions, refer to the [Usage Guide](./docs/USAGE.md).
 - 📋 Copy encrypted files to a new location.
 - 🔢 Generate strong passwords for credentials.
 - 🔍 Find account name.
+- 📥 Import `.enc` files from other machines or backups.
+- 🕒 Track password change history (up to 5 per credential).
+- 📦 File-level versioning with up to 5 snapshots.
+- ⬆️ Self-update from GitHub Releases.
 
 # Security Considerations
 
@@ -40,6 +44,17 @@ sekrets --version # to verify installation
 ```
 
 More instruction on different ways of installation can be found in the [installation guide](./docs/INSTALLATION.md)
+
+## Updating
+
+To update to the latest version:
+```sh
+sekrets --update
+```
+If installed to a system path (`/usr/local/bin/`), run with `sudo`:
+```sh
+sudo sekrets --update
+```
 
 ## Uninstallation
 

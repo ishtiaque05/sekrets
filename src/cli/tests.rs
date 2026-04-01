@@ -19,9 +19,9 @@ use crate::{
 fn test_cli_encrypt_parsing() {
     expect_that!(
         Cli::parse_from(vec!["sekrets", "encrypt", "--file", "../fixtures/foo.txt"]).command,
-        eq(&Commands::Encrypt {
+        eq(&Some(Commands::Encrypt {
             file: "../fixtures/foo.txt".to_string()
-        })
+        }))
     );
 }
 
@@ -48,10 +48,11 @@ fn test_cli_decrypt_parsing() {
             "bank"
         ])
         .command,
-        eq(&Commands::Decrypt {
+        eq(&Some(Commands::Decrypt {
             accounts: vec!["github".to_string(), "bank".to_string()],
-            usernames: vec![]
-        })
+            usernames: vec![],
+            history: false,
+        }))
     );
 }
 
@@ -71,10 +72,11 @@ fn test_cli_decrypt_parsing_with_username() {
             "bar"
         ])
         .command,
-        eq(&Commands::Decrypt {
+        eq(&Some(Commands::Decrypt {
             accounts: vec!["github".to_string(), "bank".to_string()],
-            usernames: vec!["foo".to_string(), "bar".to_string()]
-        })
+            usernames: vec!["foo".to_string(), "bar".to_string()],
+            history: false,
+        }))
     );
 }
 
@@ -90,10 +92,10 @@ fn test_cli_update_creds() {
             "foo"
         ])
         .command,
-        eq(&Commands::Update {
+        eq(&Some(Commands::Update {
             account: "github".to_string(),
             username: "foo".to_string()
-        })
+        }))
     );
 }
 
@@ -101,9 +103,9 @@ fn test_cli_update_creds() {
 fn test_cli_password_generate() {
     expect_that!(
         Cli::parse_from(vec!["sekrets", "generate", "-p"]).command,
-        eq(&Commands::Generate {
+        eq(&Some(Commands::Generate {
             generate_flag: true
-        })
+        }))
     );
 }
 
@@ -252,10 +254,8 @@ fn test_run_append_command() {
         )
         .expect("Failed to decrypt file");
 
-        expect_that!(
-            decrypted_data,
-            contains_substring("bank - username: john_doe")
-        );
+        expect_that!(decrypted_data, contains_substring("bank"));
+        expect_that!(decrypted_data, contains_substring("john_doe"));
     });
 }
 
@@ -326,10 +326,9 @@ fn test_handle_update() {
         )
         .expect("Failed to decrypt file");
 
-        expect_that!(
-            decrypted_data,
-            contains_substring("github - username: git, password: bar")
-        );
+        expect_that!(decrypted_data, contains_substring("github"));
+        expect_that!(decrypted_data, contains_substring("git"));
+        expect_that!(decrypted_data, contains_substring("bar"));
     });
 }
 
@@ -349,10 +348,9 @@ fn test_handle_update_username_not_found() {
         )
         .expect("Failed to decrypt file");
 
-        expect_that!(
-            decrypted_data,
-            contains_substring("github - username: me, password: change_me")
-        );
+        expect_that!(decrypted_data, contains_substring("github"));
+        expect_that!(decrypted_data, contains_substring("me"));
+        expect_that!(decrypted_data, contains_substring("change_me"));
     });
 }
 
@@ -385,7 +383,7 @@ fn test_generate_strong_password() {
 fn test_print_credentials_fail() {
     make_encrypted_file("bank - username: foo, password: bar");
 
-    let res = decrypt::print_credentials(&["git".to_string()], vec![]);
+    let res = decrypt::print_credentials(&["git".to_string()], vec![], false);
 
     expect_that!(res, ok(()))
 }
@@ -398,10 +396,9 @@ fn test_handle_append_success_nonexisting_acc() {
 
         let data = decrypt_file(&encrypted_file_path, &prompt_user_password()).unwrap();
 
-        expect_that!(
-            data,
-            contains_substring("github - username: git, password: bar")
-        );
+        expect_that!(data, contains_substring("github"));
+        expect_that!(data, contains_substring("git"));
+        expect_that!(data, contains_substring("bar"));
     });
 }
 
@@ -419,10 +416,9 @@ fn test_handle_append_success_existing_acc_pass_update() {
 
             let data = decrypt_file(&encrypted_file_path, &prompt_user_password()).unwrap();
 
-            expect_that!(
-                data,
-                contains_substring("bank - username: foo, password: bar")
-            );
+            expect_that!(data, contains_substring("bank"));
+            expect_that!(data, contains_substring("foo"));
+            expect_that!(data, contains_substring("bar"));
         },
     );
 }
@@ -442,9 +438,9 @@ fn test_confirm_interactive_pass_mode() {
 fn find_account_cmd() {
     expect_that!(
         Cli::parse_from(vec!["sekrets", "find", "--account", "foo"]).command,
-        eq(&Commands::Find {
+        eq(&Some(Commands::Find {
             account: "foo".to_string(),
-        })
+        }))
     );
 }
 
@@ -475,9 +471,9 @@ fn find_account_cmd_success() {
 fn test_cli_export_parsing() {
     expect_that!(
         Cli::parse_from(vec!["sekrets", "export", "--output", "/tmp/out.txt"]).command,
-        eq(&Commands::Export {
+        eq(&Some(Commands::Export {
             output: "/tmp/out.txt".to_string()
-        })
+        }))
     );
 }
 

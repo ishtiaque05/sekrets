@@ -1,3 +1,5 @@
+use chrono::Utc;
+
 use crate::{
     encryption::{self, decryptor, encryptor},
     helpers::directories::get_encrypted_file_path,
@@ -11,6 +13,7 @@ use crate::{
 pub struct CredentialManager {
     master_password: String,
     pub credentials: CredentialHashMap,
+    pub needs_migration: bool,
 }
 
 impl CredentialManager {
@@ -20,10 +23,23 @@ impl CredentialManager {
             .to_string();
         let decrypted_data = decryptor::decrypt_file(&encrypted_filepath, &master_password)?;
         let parser = CredentialFileParser::new(decrypted_data);
+        let needs_migration = parser.is_legacy_format();
+        let mut credentials = parser.get_all_credentials();
+
+        // If legacy format, stamp credentials with current time
+        if needs_migration {
+            let now = Utc::now().to_rfc3339();
+            for cred in credentials.values_mut() {
+                if cred.ts.is_empty() {
+                    cred.ts = now.clone();
+                }
+            }
+        }
 
         Ok(Self {
             master_password,
-            credentials: parser.get_all_credentials(),
+            credentials,
+            needs_migration,
         })
     }
 
@@ -81,15 +97,22 @@ impl CredentialManager {
     }
 
     pub fn save_credentials(&self) -> Result<(), FileError> {
-        let updated_data: String = self
-            .credentials
-            .values()
-            .map(|c| c.format_as_str())
-            .collect::<Vec<_>>()
-            .join("\n");
-        let _ = encryptor::encrypt_text(&updated_data, &self.master_password);
-
+        let updated_data = CredentialFileParser::serialize_to_jsonl(&self.credentials);
+        encryptor::encrypt_text(&updated_data, &self.master_password)?;
         Ok(())
+    }
+
+    /// Perform migration: snapshot old file as v1, save in new JSONL format.
+    pub fn migrate(&self) -> Result<(), FileError> {
+        use crate::secrets::version_manager;
+
+        let current_path = get_encrypted_file_path(encryption::encryptor::ENCRYPTED_FILENAME);
+        if current_path.exists() {
+            version_manager::snapshot_current(&current_path)
+                .map_err(|e| FileError::FileWriteError(e.to_string()))?;
+        }
+
+        self.save_credentials()
     }
 }
 

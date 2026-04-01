@@ -21,3 +21,9 @@ fn test_get_data_path() {
 
     expect_that!(data_path, eq(expected_path));
 }
+
+#[test]
+fn test_get_versions_path_exists() {
+    let path = get_versions_path();
+    assert!(path.to_str().unwrap().contains("versions"));
+}
