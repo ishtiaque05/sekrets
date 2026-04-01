@@ -8,6 +8,7 @@ pub mod generate;
 pub mod import;
 pub mod update;
 pub mod util;
+pub mod version;
 use super::Commands;
 use anyhow::Result;
 
@@ -29,5 +30,6 @@ pub fn handle_command(cmd: Commands) -> Result<()> {
         Commands::Find { account } => find::account(account),
         Commands::Export { output } => export::handle_export(&output),
         Commands::Import { file } => import::handle_import(&file),
+        Commands::Version { list, switch } => version::handle_version(list, switch),
     }
 }

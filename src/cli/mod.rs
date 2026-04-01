@@ -83,6 +83,17 @@ pub enum Commands {
         #[arg(short, long)]
         file: String,
     },
+
+    /// Manage file-level versions
+    Version {
+        /// List all stored versions
+        #[arg(long, default_value_t = false)]
+        list: bool,
+
+        /// Switch to a specific version number
+        #[arg(long)]
+        switch: Option<usize>,
+    },
 }
 
 pub fn run(cli: Cli) -> Result<()> {
