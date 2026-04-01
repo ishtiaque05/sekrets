@@ -132,7 +132,7 @@ jobs:
           cargo tarpaulin --version
 
           echo "Running test coverage..."
-          cargo tarpaulin --tests --all-targets --out xml -- --test-threads=1 --nocapture
+          cargo tarpaulin --tests --all-targets --out xml -- --test-threads=4 --nocapture
 
       - name: Rename Coverage Report
         run: mv cobertura.xml coverage.xml
