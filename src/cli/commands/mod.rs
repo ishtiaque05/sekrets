@@ -5,6 +5,7 @@ pub mod encrypt;
 pub mod export;
 pub mod find;
 pub mod generate;
+pub mod import;
 pub mod update;
 pub mod util;
 use super::Commands;
@@ -27,5 +28,6 @@ pub fn handle_command(cmd: Commands) -> Result<()> {
         Commands::Generate { generate_flag } => generate::generate_strong_password(generate_flag),
         Commands::Find { account } => find::account(account),
         Commands::Export { output } => export::handle_export(&output),
+        Commands::Import { file } => import::handle_import(&file),
     }
 }

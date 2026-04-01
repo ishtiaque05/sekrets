@@ -76,6 +76,13 @@ pub enum Commands {
         #[arg(short, long)]
         output: String,
     },
+
+    /// Import an encrypted file as the active sekrets file
+    Import {
+        /// Path to the .enc file to import
+        #[arg(short, long)]
+        file: String,
+    },
 }
 
 pub fn run(cli: Cli) -> Result<()> {
