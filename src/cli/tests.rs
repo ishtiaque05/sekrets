@@ -50,7 +50,8 @@ fn test_cli_decrypt_parsing() {
         .command,
         eq(&Commands::Decrypt {
             accounts: vec!["github".to_string(), "bank".to_string()],
-            usernames: vec![]
+            usernames: vec![],
+            history: false,
         })
     );
 }
@@ -73,7 +74,8 @@ fn test_cli_decrypt_parsing_with_username() {
         .command,
         eq(&Commands::Decrypt {
             accounts: vec!["github".to_string(), "bank".to_string()],
-            usernames: vec!["foo".to_string(), "bar".to_string()]
+            usernames: vec!["foo".to_string(), "bar".to_string()],
+            history: false,
         })
     );
 }
@@ -381,7 +383,7 @@ fn test_generate_strong_password() {
 fn test_print_credentials_fail() {
     make_encrypted_file("bank - username: foo, password: bar");
 
-    let res = decrypt::print_credentials(&["git".to_string()], vec![]);
+    let res = decrypt::print_credentials(&["git".to_string()], vec![], false);
 
     expect_that!(res, ok(()))
 }

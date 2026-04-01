@@ -4,25 +4,30 @@ use crate::secrets::{
     credential_manager::CredentialManager, password_generator::prompt_user_password,
 };
 
-pub fn handle_decrypt(accounts: &[String], usernames: &[String]) -> Result<()> {
+pub fn handle_decrypt(accounts: &[String], usernames: &[String], history: bool) -> Result<()> {
     if usernames.is_empty() {
         let unames = vec![None; accounts.len()];
-        print_credentials(accounts, unames).expect("to print credentails");
+        print_credentials(accounts, unames, history).expect("to print credentials");
     } else {
         if accounts.len() != usernames.len() {
             return Err(anyhow::anyhow!("Mismatched accounts and usernames"));
         }
 
         let some_usernames = usernames.iter().map(|s| Some(s.clone())).collect();
-        print_credentials(accounts, some_usernames).expect("to print credentails");
+        print_credentials(accounts, some_usernames, history).expect("to print credentials");
     }
 
     Ok(())
 }
 
-pub fn print_credentials(accounts: &[String], usernames: Vec<Option<String>>) -> Result<()> {
+pub fn print_credentials(
+    accounts: &[String],
+    usernames: Vec<Option<String>>,
+    show_history: bool,
+) -> Result<()> {
     let master_pass = prompt_user_password();
     let cred_manager = CredentialManager::new(master_pass)?;
+
     crate::cli::commands::util::check_and_migrate(&cred_manager)?;
 
     for (account, username) in accounts.iter().zip(usernames.iter()) {
@@ -33,6 +38,22 @@ pub fn print_credentials(accounts: &[String], usernames: Vec<Option<String>>) ->
                         "Account: {} - Username: {}, Password: {}",
                         cred.account, cred.username, cred.password
                     );
+
+                    if show_history {
+                        println!("  current:  ********     ({})", cred.format_ts_local());
+                        for (i, entry) in cred.history.iter().enumerate() {
+                            let local_ts = {
+                                use chrono::{DateTime, Local, Utc};
+                                if let Ok(utc) = entry.ts.parse::<DateTime<Utc>>() {
+                                    let local: DateTime<Local> = utc.into();
+                                    local.format("%Y-%m-%d %I:%M %p %Z").to_string()
+                                } else {
+                                    entry.ts.clone()
+                                }
+                            };
+                            println!("  v{}:       ********     ({})", i + 1, local_ts);
+                        }
+                    }
                 }
             }
             Err(e) => {

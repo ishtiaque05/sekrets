@@ -29,6 +29,10 @@ pub enum Commands {
 
         #[arg(short, long = "username", required = false)]
         usernames: Vec<String>,
+
+        /// Show password change history
+        #[arg(long, default_value_t = false)]
+        history: bool,
     },
 
     /// Copy the encrypted file to a new location

@@ -16,7 +16,8 @@ pub fn handle_command(cmd: Commands) -> Result<()> {
         Commands::Decrypt {
             accounts,
             usernames,
-        } => decrypt::handle_decrypt(&accounts, &usernames),
+            history,
+        } => decrypt::handle_decrypt(&accounts, &usernames, history),
         Commands::Copy { dest } => copy::handle_copy(&dest),
         Commands::Append {
             accounts,
