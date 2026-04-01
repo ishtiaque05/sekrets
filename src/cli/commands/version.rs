@@ -74,4 +74,3 @@ fn switch_version(n: usize) -> Result<()> {
 
     Ok(())
 }
-

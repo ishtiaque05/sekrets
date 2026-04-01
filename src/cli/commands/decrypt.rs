@@ -42,7 +42,11 @@ pub fn print_credentials(
                     if show_history {
                         println!("  current:  ********     ({})", cred.format_ts_local());
                         for (i, entry) in cred.history.iter().enumerate() {
-                            println!("  v{}:       ********     ({})", i + 1, entry.format_ts_local());
+                            println!(
+                                "  v{}:       ********     ({})",
+                                i + 1,
+                                entry.format_ts_local()
+                            );
                         }
                     }
                 }

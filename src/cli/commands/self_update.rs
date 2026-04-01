@@ -155,7 +155,11 @@ fn is_path_writable(path: &std::path::Path) -> bool {
     }
 }
 
-fn install_update(archive_data: &[u8], target_path: &std::path::Path, asset_name: &str) -> Result<()> {
+fn install_update(
+    archive_data: &[u8],
+    target_path: &std::path::Path,
+    asset_name: &str,
+) -> Result<()> {
     let temp_dir = tempfile::tempdir()?;
 
     if asset_name.ends_with(".tar.gz") {

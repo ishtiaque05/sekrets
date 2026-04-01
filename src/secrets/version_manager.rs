@@ -23,8 +23,8 @@ pub fn snapshot_current(current_file: &std::path::Path) -> Result<()> {
     let versions_dir = get_versions_path();
 
     // Find the lowest unused slot
-    let next_slot = (1..=MAX_VERSIONS)
-        .find(|i| !versions_dir.join(format!("sekrets.v{}.enc", i)).exists());
+    let next_slot =
+        (1..=MAX_VERSIONS).find(|i| !versions_dir.join(format!("sekrets.v{}.enc", i)).exists());
 
     if let Some(slot) = next_slot {
         // Empty slot available — use it directly
