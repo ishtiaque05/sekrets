@@ -44,7 +44,9 @@ pub fn handle_self_update() -> Result<()> {
         .assets
         .iter()
         .find(|a| a.name == asset_name)
-        .ok_or_else(|| anyhow::anyhow!("No release asset found for this platform: {}", asset_name))?;
+        .ok_or_else(|| {
+            anyhow::anyhow!("No release asset found for this platform: {}", asset_name)
+        })?;
 
     println!("Downloading {}...", asset.name);
     let binary_data = download_asset(&asset.browser_download_url)?;
@@ -95,13 +97,17 @@ fn fetch_latest_release() -> Result<Release> {
         .user_agent("sekrets-updater")
         .build()?;
 
-    let response = client
-        .get(&url)
-        .send()
-        .map_err(|e| anyhow::anyhow!("Failed to check for updates: {}. Check your internet connection.", e))?;
+    let response = client.get(&url).send().map_err(|e| {
+        anyhow::anyhow!(
+            "Failed to check for updates: {}. Check your internet connection.",
+            e
+        )
+    })?;
 
     if response.status() == reqwest::StatusCode::FORBIDDEN {
-        return Err(anyhow::anyhow!("GitHub API rate limit exceeded. Try again later."));
+        return Err(anyhow::anyhow!(
+            "GitHub API rate limit exceeded. Try again later."
+        ));
     }
 
     response
@@ -131,7 +137,7 @@ fn download_asset(url: &str) -> Result<Vec<u8>> {
     Ok(bytes.to_vec())
 }
 
-fn is_path_writable(path: &PathBuf) -> bool {
+fn is_path_writable(path: &std::path::Path) -> bool {
     if let Some(parent) = path.parent() {
         let test_path = parent.join(".sekrets_update_test");
         match fs::write(&test_path, b"test") {
@@ -176,7 +182,8 @@ fn install_update(archive_data: &[u8], target_path: &PathBuf, asset_name: &str) 
         let _ = fs::remove_file(&backup_path);
     } else {
         return Err(anyhow::anyhow!(
-            "Unsupported archive format: {}", asset_name
+            "Unsupported archive format: {}",
+            asset_name
         ));
     }
 

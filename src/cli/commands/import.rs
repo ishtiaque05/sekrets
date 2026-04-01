@@ -4,10 +4,7 @@ use std::path::Path;
 use crate::{
     encryption::{decryptor, encryptor},
     helpers::directories::get_encrypted_file_path,
-    secrets::{
-        credential_file_parser::CredentialFileParser,
-        version_manager,
-    },
+    secrets::{credential_file_parser::CredentialFileParser, version_manager},
 };
 
 pub fn handle_import(file: &str) -> Result<()> {
@@ -46,7 +43,9 @@ pub fn handle_import(file: &str) -> Result<()> {
     let parser = CredentialFileParser::new(import_data.clone());
     let credentials = parser.get_all_credentials();
     if credentials.is_empty() && !import_data.trim().is_empty() {
-        return Err(anyhow::anyhow!("Import file doesn't contain valid sekrets data"));
+        return Err(anyhow::anyhow!(
+            "Import file doesn't contain valid sekrets data"
+        ));
     }
 
     // Snapshot current file before replacing (if it exists)

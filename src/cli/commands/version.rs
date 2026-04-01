@@ -61,11 +61,9 @@ fn switch_version(n: usize) -> Result<()> {
     let version_password = prompt_password()?;
 
     // Validate by decrypting
-    let version_data = decryptor::decrypt_file(
-        version_path.to_string_lossy().as_ref(),
-        &version_password,
-    )
-    .map_err(|_| anyhow::anyhow!("Failed to decrypt version v{}. Wrong password?", n))?;
+    let version_data =
+        decryptor::decrypt_file(version_path.to_string_lossy().as_ref(), &version_password)
+            .map_err(|_| anyhow::anyhow!("Failed to decrypt version v{}. Wrong password?", n))?;
 
     // Prompt for current master password to re-encrypt
     println!("Enter your current master password (to re-encrypt):");

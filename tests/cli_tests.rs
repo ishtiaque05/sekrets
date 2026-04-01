@@ -215,8 +215,7 @@ fn test_history_flag() {
     TestCleanup::clean();
 
     // Create and encrypt initial file
-    let initial =
-        create_temp_plaintext_file("github - username: histuser, password: initialpass");
+    let initial = create_temp_plaintext_file("github - username: histuser, password: initialpass");
     run_sekrets_command(&["encrypt", "-f", initial.path().to_str().unwrap()])
         .assert()
         .success();

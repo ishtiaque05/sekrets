@@ -97,8 +97,7 @@ impl CredentialManager {
     }
 
     pub fn save_credentials(&self) -> Result<(), FileError> {
-        let updated_data =
-            CredentialFileParser::serialize_to_jsonl(&self.credentials);
+        let updated_data = CredentialFileParser::serialize_to_jsonl(&self.credentials);
         let _ = encryptor::encrypt_text(&updated_data, &self.master_password);
 
         Ok(())

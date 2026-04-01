@@ -1,5 +1,5 @@
-use anyhow::Result;
 use crate::secrets::credential_manager::CredentialManager;
+use anyhow::Result;
 
 /// Check if migration is needed and prompt user.
 /// Returns Ok(true) if migration was performed, Ok(false) if not needed.

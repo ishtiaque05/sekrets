@@ -26,7 +26,9 @@ pub fn make_encrypted_file(content: &str) -> String {
 }
 
 /// Creates an encrypted file with JSONL content from Credential structs.
-pub fn make_encrypted_jsonl_file(credentials: &[crate::secrets::credentials::Credential]) -> String {
+pub fn make_encrypted_jsonl_file(
+    credentials: &[crate::secrets::credentials::Credential],
+) -> String {
     let jsonl = credentials
         .iter()
         .map(|c| serde_json::to_string(c).unwrap())

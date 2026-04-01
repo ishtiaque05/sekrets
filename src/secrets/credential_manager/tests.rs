@@ -4,11 +4,15 @@ use crate::secrets::password_generator::prompt_user_password;
 use crate::tests::helpers::{make_encrypted_file, make_encrypted_jsonl_file};
 use crate::{helpers::directories::get_encrypted_file_path, secrets::credentials::Credential};
 use googletest::prelude::*;
-use std::collections::HashMap;
 use serde_json;
+use std::collections::HashMap;
 
 fn mock_credential(account: &str, username: &str, password: &str) -> Credential {
-    Credential::new(account.to_string(), username.to_string(), password.to_string())
+    Credential::new(
+        account.to_string(),
+        username.to_string(),
+        password.to_string(),
+    )
 }
 
 #[googletest::test]
@@ -82,7 +86,11 @@ fn test_save_credentials_jsonl_format() {
 
     manager.credentials.insert(
         ("github".to_string(), "user1".to_string()),
-        Credential::new("github".to_string(), "user1".to_string(), "pass1".to_string()),
+        Credential::new(
+            "github".to_string(),
+            "user1".to_string(),
+            "pass1".to_string(),
+        ),
     );
 
     let result = manager.save_credentials();
@@ -90,7 +98,9 @@ fn test_save_credentials_jsonl_format() {
 
     // Decrypt and verify it's JSONL format
     let data = decrypt_file(
-        get_encrypted_file_path(ENCRYPTED_FILENAME).to_str().unwrap(),
+        get_encrypted_file_path(ENCRYPTED_FILENAME)
+            .to_str()
+            .unwrap(),
         "foo",
     )
     .unwrap();
@@ -273,9 +283,11 @@ fn test_loading_legacy_format_triggers_migration_flag() {
 
 #[googletest::test]
 fn test_loading_jsonl_format_no_migration() {
-    let creds = vec![
-        Credential::new("github".to_string(), "foo".to_string(), "bar".to_string()),
-    ];
+    let creds = vec![Credential::new(
+        "github".to_string(),
+        "foo".to_string(),
+        "bar".to_string(),
+    )];
     let _ = make_encrypted_jsonl_file(&creds);
 
     let manager = CredentialManager::new(prompt_user_password()).expect("not to fail");

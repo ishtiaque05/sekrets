@@ -47,12 +47,16 @@ fn test_parse_jsonl_format() {
 
     expect_that!(result.len(), eq(2));
 
-    let github = result.get(&("github".to_string(), "foo".to_string())).unwrap();
+    let github = result
+        .get(&("github".to_string(), "foo".to_string()))
+        .unwrap();
     expect_that!(github.password, eq("bar"));
     expect_that!(github.ts, eq("2026-03-31T10:00:00Z"));
     expect_that!(github.history.len(), eq(0));
 
-    let bank = result.get(&("bank".to_string(), "baz".to_string())).unwrap();
+    let bank = result
+        .get(&("bank".to_string(), "baz".to_string()))
+        .unwrap();
     expect_that!(bank.password, eq("secret"));
     expect_that!(bank.history.len(), eq(1));
     expect_that!(bank.history[0].password, eq("old"));

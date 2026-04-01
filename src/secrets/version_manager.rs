@@ -5,6 +5,7 @@ use std::path::PathBuf;
 
 pub const MAX_VERSIONS: usize = 5;
 
+#[allow(dead_code)]
 pub struct VersionInfo {
     pub number: usize,
     pub path: PathBuf,
@@ -40,11 +41,17 @@ pub fn snapshot_current(current_file: &std::path::Path) -> Result<()> {
         }
 
         // Save current as v5
-        fs::copy(current_file, versions_dir.join(format!("sekrets.v{}.enc", MAX_VERSIONS)))?;
+        fs::copy(
+            current_file,
+            versions_dir.join(format!("sekrets.v{}.enc", MAX_VERSIONS)),
+        )?;
     } else {
         // Save as next available slot
         let next = existing_count + 1;
-        fs::copy(current_file, versions_dir.join(format!("sekrets.v{}.enc", next)))?;
+        fs::copy(
+            current_file,
+            versions_dir.join(format!("sekrets.v{}.enc", next)),
+        )?;
     }
 
     Ok(())

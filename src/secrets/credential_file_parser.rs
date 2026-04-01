@@ -45,10 +45,7 @@ impl CredentialFileParser {
                 continue;
             }
             if let Ok(cred) = serde_json::from_str::<Credential>(line) {
-                credentials_map.insert(
-                    (cred.account.clone(), cred.username.clone()),
-                    cred,
-                );
+                credentials_map.insert((cred.account.clone(), cred.username.clone()), cred);
             }
         }
 
