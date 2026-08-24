@@ -25,8 +25,11 @@ pub fn snapshot_current(current_file: &std::path::Path) -> Result<(), FileError>
         (1..=MAX_VERSIONS).find(|i| !versions_dir.join(format!("sekrets.v{}.enc", i)).exists());
 
     if let Some(slot) = next_slot {
-        fs::copy(current_file, versions_dir.join(format!("sekrets.v{}.enc", slot)))
-            .map_err(|e| FileError::FileWriteError(e.to_string()))?;
+        fs::copy(
+            current_file,
+            versions_dir.join(format!("sekrets.v{}.enc", slot)),
+        )
+        .map_err(|e| FileError::FileWriteError(e.to_string()))?;
     } else {
         let v1 = versions_dir.join("sekrets.v1.enc");
         if v1.exists() {
@@ -41,8 +44,11 @@ pub fn snapshot_current(current_file: &std::path::Path) -> Result<(), FileError>
             }
         }
 
-        fs::copy(current_file, versions_dir.join(format!("sekrets.v{}.enc", MAX_VERSIONS)))
-            .map_err(|e| FileError::FileWriteError(e.to_string()))?;
+        fs::copy(
+            current_file,
+            versions_dir.join(format!("sekrets.v{}.enc", MAX_VERSIONS)),
+        )
+        .map_err(|e| FileError::FileWriteError(e.to_string()))?;
     }
 
     Ok(())
@@ -56,9 +62,14 @@ pub fn list_versions() -> Result<Vec<VersionInfo>, FileError> {
     for i in 1..=MAX_VERSIONS {
         let path = versions_dir.join(format!("sekrets.v{}.enc", i));
         if path.exists() {
-            let metadata = fs::metadata(&path).map_err(|e| FileError::FileReadError(e.to_string()))?;
+            let metadata =
+                fs::metadata(&path).map_err(|e| FileError::FileReadError(e.to_string()))?;
             let modified = metadata.modified().unwrap_or(std::time::UNIX_EPOCH);
-            versions.push(VersionInfo { number: i, path, modified });
+            versions.push(VersionInfo {
+                number: i,
+                path,
+                modified,
+            });
         }
     }
 

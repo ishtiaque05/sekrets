@@ -85,10 +85,7 @@ impl Vault {
     pub fn create(master_password: &str) -> Result<Vault, VaultError> {
         let path = get_encrypted_file_path(ENCRYPTED_FILENAME);
         if path.exists() {
-            return Err(VaultError::Io(format!(
-                "{} already exists",
-                path.display()
-            )));
+            return Err(VaultError::Io(format!("{} already exists", path.display())));
         }
 
         encryptor::encrypt_text("", master_password)?;
@@ -113,7 +110,9 @@ impl Vault {
         self.manager
             .credentials
             .values()
-            .filter(|c| c.account.to_lowercase().contains(&q) || c.username.to_lowercase().contains(&q))
+            .filter(|c| {
+                c.account.to_lowercase().contains(&q) || c.username.to_lowercase().contains(&q)
+            })
             .collect()
     }
 
@@ -127,19 +126,27 @@ impl Vault {
         }
         self.manager.credentials.insert(
             key,
-            Credential::new(account.to_string(), username.to_string(), password.to_string()),
+            Credential::new(
+                account.to_string(),
+                username.to_string(),
+                password.to_string(),
+            ),
         );
         self.save()
     }
 
-    pub fn update(&mut self, account: &str, username: &str, new_password: &str) -> Result<(), VaultError> {
-        let cred = self
-            .manager
-            .find_creds(account, username)
-            .ok_or_else(|| VaultError::AccountWithUsernameNotFound {
+    pub fn update(
+        &mut self,
+        account: &str,
+        username: &str,
+        new_password: &str,
+    ) -> Result<(), VaultError> {
+        let cred = self.manager.find_creds(account, username).ok_or_else(|| {
+            VaultError::AccountWithUsernameNotFound {
                 account: account.to_string(),
                 username: username.to_string(),
-            })?;
+            }
+        })?;
         cred.update_pass(new_password.to_string());
         self.save()
     }

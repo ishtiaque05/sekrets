@@ -24,7 +24,9 @@ pub fn make_encrypted_file(content: &str) -> String {
     encrypt_file(file_path.path().to_str().unwrap(), TEST_PASSWORD).expect("Failed to encrypt file")
 }
 
-pub fn make_encrypted_jsonl_file(credentials: &[crate::secrets::credentials::Credential]) -> String {
+pub fn make_encrypted_jsonl_file(
+    credentials: &[crate::secrets::credentials::Credential],
+) -> String {
     let jsonl = credentials
         .iter()
         .map(|c| serde_json::to_string(c).unwrap())

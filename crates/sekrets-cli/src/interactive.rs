@@ -80,9 +80,7 @@ pub fn interactive_mode() -> Result<String, PasswordGenerationError> {
         eprintln!("✅ Your password is strong!");
         Ok(password)
     } else {
-        eprintln!(
-            "⚠️ Warning: Your password is weak. Consider making it longer or more complex."
-        );
+        eprintln!("⚠️ Warning: Your password is weak. Consider making it longer or more complex.");
         Err(PasswordGenerationError::IsWeak)
     }
 }
