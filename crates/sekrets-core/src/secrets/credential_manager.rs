@@ -10,6 +10,7 @@ use crate::{
     types::{CredentialError, FileError},
 };
 
+#[derive(Debug)]
 pub struct CredentialManager {
     master_password: String,
     pub credentials: CredentialHashMap,
@@ -112,6 +113,14 @@ impl CredentialManager {
         }
 
         self.save_credentials()
+    }
+
+    pub fn master_password(&self) -> &str {
+        &self.master_password
+    }
+
+    pub fn set_master_password(&mut self, new_password: String) {
+        self.master_password = new_password;
     }
 }
 

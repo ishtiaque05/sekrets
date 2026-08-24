@@ -1,0 +1,107 @@
+use std::path::PathBuf;
+
+use thiserror::Error;
+
+use crate::encryption::{
+    decryptor,
+    encryptor::{self, ENCRYPTED_FILENAME},
+};
+use crate::helpers::directories::get_encrypted_file_path;
+use crate::secrets::credential_manager::CredentialManager;
+use crate::types::{CredentialError, FileError};
+
+#[derive(Error, Debug)]
+pub enum VaultError {
+    #[error("No sekrets file found at {0}")]
+    FileNotFound(PathBuf),
+    #[error("Incorrect master password")]
+    WrongPassword,
+    #[error("Sekrets file is corrupt: {0}")]
+    Corrupt(String),
+    #[error("No credentials found for account: `{account}'")]
+    AccountNotFound { account: String },
+    #[error("A credential already exists for account `{account}' with username `{username}'")]
+    AccountAlreadyExists { account: String, username: String },
+    #[error("No credentials found for account: `{account}' with username: `{username}'")]
+    AccountWithUsernameNotFound { account: String, username: String },
+    #[error("I/O error: {0}")]
+    Io(String),
+}
+
+impl From<FileError> for VaultError {
+    fn from(err: FileError) -> Self {
+        match err {
+            FileError::InvalidCiphertext(msg) => VaultError::Corrupt(msg),
+            FileError::FileReadError(msg) | FileError::FileWriteError(msg) => VaultError::Io(msg),
+            FileError::HashingError(_)
+            | FileError::InvalidHashOutput(_)
+            | FileError::InvalidNonceSize(_)
+            | FileError::EncryptionError(_)
+            | FileError::DecryptionError(_)
+            | FileError::KeyGenerationError(_) => VaultError::WrongPassword,
+        }
+    }
+}
+
+impl From<CredentialError> for VaultError {
+    fn from(err: CredentialError) -> Self {
+        match err {
+            CredentialError::AccountNotFound(account) => VaultError::AccountNotFound { account },
+            CredentialError::AccountWithUsernameNotFound(account, username) => {
+                VaultError::AccountWithUsernameNotFound { account, username }
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Vault {
+    manager: CredentialManager,
+}
+
+impl Vault {
+    pub fn locate() -> Option<PathBuf> {
+        let path = get_encrypted_file_path(ENCRYPTED_FILENAME);
+        if path.exists() {
+            Some(path)
+        } else {
+            None
+        }
+    }
+
+    pub fn unlock(master_password: &str) -> Result<Vault, VaultError> {
+        let path = get_encrypted_file_path(ENCRYPTED_FILENAME);
+        if !path.exists() {
+            return Err(VaultError::FileNotFound(path));
+        }
+
+        let manager = CredentialManager::new(master_password.to_string())?;
+        Ok(Vault { manager })
+    }
+
+    pub fn create(master_password: &str) -> Result<Vault, VaultError> {
+        let path = get_encrypted_file_path(ENCRYPTED_FILENAME);
+        if path.exists() {
+            return Err(VaultError::Io(format!(
+                "{} already exists",
+                path.display()
+            )));
+        }
+
+        encryptor::encrypt_text("", master_password)?;
+        Vault::unlock(master_password)
+    }
+
+    pub fn needs_migration(&self) -> bool {
+        self.manager.needs_migration
+    }
+
+    pub fn migrate(&mut self) -> Result<(), VaultError> {
+        self.manager.migrate()?;
+        self.manager.needs_migration = false;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests;
