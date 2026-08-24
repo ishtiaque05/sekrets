@@ -9,6 +9,7 @@ use crate::encryption::{
 use crate::helpers::directories::get_encrypted_file_path;
 use crate::secrets::credential_manager::CredentialManager;
 use crate::secrets::credentials::Credential;
+use crate::secrets::credentials::HistoryEntry;
 use crate::types::{CredentialError, FileError};
 
 #[derive(Error, Debug)]
@@ -155,6 +156,22 @@ impl Vault {
 
     pub fn save(&self) -> Result<(), VaultError> {
         self.manager.save_credentials().map_err(VaultError::from)
+    }
+
+    pub fn history(&self, account: &str, username: &str) -> Result<&[HistoryEntry], VaultError> {
+        self.manager
+            .credentials
+            .get(&(account.to_string(), username.to_string()))
+            .map(|c| c.history.as_slice())
+            .ok_or_else(|| VaultError::AccountWithUsernameNotFound {
+                account: account.to_string(),
+                username: username.to_string(),
+            })
+    }
+
+    pub fn change_master_password(&mut self, new_password: &str) -> Result<(), VaultError> {
+        self.manager.set_master_password(new_password.to_string());
+        self.save()
     }
 }
 

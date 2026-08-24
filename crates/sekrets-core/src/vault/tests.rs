@@ -115,3 +115,43 @@ fn test_delete_existing_removes_it() {
     vault.delete("github", "alice").expect("delete should succeed");
     expect_that!(vault.search("github").len(), eq(0));
 }
+
+#[googletest::test]
+fn test_history_missing_returns_not_found() {
+    let vault = Vault::create(TEST_PASSWORD).expect("create should succeed");
+    let result = vault.history("github", "alice");
+    expect_that!(
+        result,
+        err(matches_pattern!(VaultError::AccountWithUsernameNotFound { .. }))
+    );
+}
+
+#[googletest::test]
+fn test_history_reflects_password_changes() {
+    let mut vault = Vault::create(TEST_PASSWORD).expect("create should succeed");
+    vault.add("github", "alice", "v1").expect("add should succeed");
+    vault.update("github", "alice", "v2").expect("update should succeed");
+    vault.update("github", "alice", "v3").expect("update should succeed");
+
+    let history = vault.history("github", "alice").expect("history should succeed");
+    expect_that!(history.len(), eq(2));
+    expect_that!(history[0].password, eq("v2"));
+    expect_that!(history[1].password, eq("v1"));
+}
+
+#[googletest::test]
+fn test_change_master_password_then_old_password_fails_to_unlock() {
+    let mut vault = Vault::create(TEST_PASSWORD).expect("create should succeed");
+    vault.add("github", "alice", "hunter2").expect("add should succeed");
+
+    vault
+        .change_master_password("new-master-password")
+        .expect("change should succeed");
+
+    let old_unlock = Vault::unlock(TEST_PASSWORD);
+    expect_that!(old_unlock, err(matches_pattern!(VaultError::WrongPassword)));
+
+    let new_unlock = Vault::unlock("new-master-password");
+    expect_pred!(new_unlock.is_ok());
+    expect_that!(new_unlock.unwrap().search("github").len(), eq(1));
+}
