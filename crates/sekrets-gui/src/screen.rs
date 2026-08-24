@@ -408,16 +408,28 @@ impl SekretsApp {
                         } else {
                             "••••••••".to_string()
                         };
-                        column![
+                        let mut col = column![
                             text(format!("{} — {}", cred.account, cred.username)),
                             text(password_display),
                             button(if *revealed { "Hide" } else { "Reveal" })
                                 .on_press(Message::RevealToggled),
                             button("Copy password")
                                 .on_press(Message::CopyPassword(cred.password.clone())),
+                            text("Password history:"),
                         ]
-                        .spacing(10)
-                        .into()
+                        .spacing(10);
+                        if cred.history.is_empty() {
+                            col = col.push(text("No previous passwords recorded."));
+                        } else {
+                            for (i, entry) in cred.history.iter().enumerate() {
+                                col = col.push(text(format!(
+                                    "v{}: ******** ({})",
+                                    i + 1,
+                                    entry.format_ts_local()
+                                )));
+                            }
+                        }
+                        col.into()
                     }
                     None => text("Credential not found").into(),
                 }
@@ -440,6 +452,8 @@ impl SekretsApp {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const TEST_PASSWORD: &str = "hunter2";
 
     #[test]
     fn locating_transitions_to_locked_when_vault_found() {
@@ -688,5 +702,29 @@ mod tests {
             Instant::now(),
             std::time::Duration::from_secs(30)
         ));
+    }
+
+    #[test]
+    fn detail_view_renders_without_panicking_when_history_present() {
+        let mut vault = sekrets_core::Vault::create(TEST_PASSWORD).expect("create should succeed");
+        vault
+            .add("github", "alice", "v1")
+            .expect("add should succeed");
+        vault
+            .update("github", "alice", "v2")
+            .expect("update should succeed");
+
+        let app = SekretsApp {
+            screen: Some(Screen::Unlocked {
+                vault,
+                view: UnlockedView::Detail {
+                    key: ("github".to_string(), "alice".to_string()),
+                    revealed: true,
+                },
+                last_activity: Instant::now(),
+                clipboard_copied_at: None,
+            }),
+        };
+        let _ = app.view(); // must not panic
     }
 }
