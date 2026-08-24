@@ -38,7 +38,15 @@ pub enum Screen {
 
 #[allow(dead_code)]
 pub enum UnlockedView {
-    List { query: String },
+    List {
+        query: String,
+    },
+    // Fully built out by Task E2 (Detail view: reveal/copy/clipboard); this task
+    // only needs the variant to exist so `CredentialSelected` can transition into it.
+    Detail {
+        key: (String, String),
+        revealed: bool,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -54,6 +62,8 @@ pub enum Message {
     MigrateAccepted,
     MigrateDeclined,
     MigrateCompleted(Vault, Result<(), VaultError>),
+    SearchChanged(String),
+    CredentialSelected(String, String),
 }
 
 fn enter_unlocked_or_migration(vault: Vault) -> Screen {
@@ -238,6 +248,33 @@ impl SekretsApp {
                 });
                 Task::none()
             }
+            Message::SearchChanged(new_query) => {
+                if let Some(Screen::Unlocked {
+                    view: UnlockedView::List { query },
+                    last_activity,
+                    ..
+                }) = &mut self.screen
+                {
+                    *query = new_query;
+                    *last_activity = Instant::now();
+                }
+                Task::none()
+            }
+            Message::CredentialSelected(account, username) => {
+                if let Some(Screen::Unlocked {
+                    view,
+                    last_activity,
+                    ..
+                }) = &mut self.screen
+                {
+                    *view = UnlockedView::Detail {
+                        key: (account, username),
+                        revealed: false,
+                    };
+                    *last_activity = Instant::now();
+                }
+                Task::none()
+            }
         }
     }
 
@@ -294,7 +331,30 @@ impl SekretsApp {
                 }
                 col.into()
             }
-            Some(Screen::Unlocked { .. }) => text("Unlocked").into(),
+            Some(Screen::Unlocked {
+                vault,
+                view: UnlockedView::List { query },
+                ..
+            }) => {
+                let results = vault.search(query);
+                let mut list = column![
+                    text_input("Search accounts or usernames", query)
+                        .on_input(Message::SearchChanged),
+                ]
+                .spacing(10);
+                for cred in results {
+                    list = list.push(
+                        button(text(format!("{} — {}", cred.account, cred.username))).on_press(
+                            Message::CredentialSelected(cred.account.clone(), cred.username.clone()),
+                        ),
+                    );
+                }
+                list.into()
+            }
+            Some(Screen::Unlocked {
+                view: UnlockedView::Detail { .. },
+                ..
+            }) => text("Detail").into(),
             Some(Screen::MigrationPrompt { .. }) => column![
                 text("Your sekrets file uses an older format."),
                 text(
@@ -468,6 +528,30 @@ mod tests {
         match &app.screen {
             Some(Screen::Unlocked { vault, .. }) => assert!(!vault.needs_migration()),
             _ => panic!("expected Unlocked screen"),
+        }
+    }
+
+    #[test]
+    fn search_changed_updates_query_in_list_view() {
+        let vault = sekrets_core::Vault::create("hunter2").expect("create should succeed");
+        let mut app = SekretsApp {
+            screen: Some(Screen::Unlocked {
+                vault,
+                view: UnlockedView::List {
+                    query: String::new(),
+                },
+                last_activity: Instant::now(),
+            }),
+        };
+        let _ = app.update(Message::SearchChanged("git".to_string()));
+        match &app.screen {
+            Some(Screen::Unlocked {
+                view: UnlockedView::List { query },
+                ..
+            }) => {
+                assert_eq!(query, "git")
+            }
+            _ => panic!("expected List view"),
         }
     }
 
