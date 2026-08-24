@@ -1,5 +1,5 @@
 pub mod cli;
-mod secrets;
+mod interactive;
 
 // include helper files
 #[cfg(test)]

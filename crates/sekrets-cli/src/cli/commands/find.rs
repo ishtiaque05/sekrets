@@ -1,4 +1,4 @@
-use crate::secrets::password_generator::prompt_user_password;
+use crate::interactive::prompt_user_password;
 use anyhow::Result;
 use sekrets_core::secrets::credential_manager::CredentialManager;
 

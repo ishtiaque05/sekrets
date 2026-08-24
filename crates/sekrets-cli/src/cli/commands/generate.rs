@@ -1,9 +1,10 @@
-use crate::secrets::password_generator::{PasswordGenerationError, PasswordGenerator};
+use crate::interactive::interactive_mode;
 use anyhow::Result;
+use sekrets_core::secrets::password_generator::PasswordGenerationError;
 
 pub fn generate_strong_password(flag: bool) -> Result<()> {
     if flag {
-        PasswordGenerator::interactive_mode().map_err(anyhow::Error::from)?;
+        interactive_mode().map_err(anyhow::Error::from)?;
         Ok(())
     } else {
         Err(PasswordGenerationError::NoChoiceSelected.into())

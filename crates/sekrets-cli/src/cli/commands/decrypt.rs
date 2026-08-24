@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use crate::secrets::password_generator::prompt_user_password;
+use crate::interactive::prompt_user_password;
 use sekrets_core::secrets::credential_manager::CredentialManager;
 
 pub fn handle_decrypt(accounts: &[String], usernames: &[String], history: bool) -> Result<()> {

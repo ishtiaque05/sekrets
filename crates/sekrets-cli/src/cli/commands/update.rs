@@ -1,4 +1,4 @@
-use crate::secrets::password_generator::{prompt_user_password, PasswordGenerator};
+use crate::interactive::{interactive_mode, prompt_user_password};
 use anyhow::Result;
 use sekrets_core::secrets::credential_manager::CredentialManager;
 
@@ -13,7 +13,7 @@ pub fn handle_update(account: String, username: String) -> Result<()> {
             account, username
         );
 
-        let new_password = PasswordGenerator::interactive_mode()?;
+        let new_password = interactive_mode()?;
 
         cred.update_pass(new_password);
         credential_manager.save_credentials()?;

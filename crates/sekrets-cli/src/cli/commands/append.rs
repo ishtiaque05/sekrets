@@ -1,6 +1,6 @@
 use crate::{
     cli::commands::util::confirm_interactive_pass_mode,
-    secrets::password_generator::{prompt_user_password, PasswordGenerator},
+    interactive::{interactive_mode, prompt_user_password},
 };
 use anyhow::Result;
 use sekrets_core::{
@@ -48,7 +48,7 @@ pub fn handle_append(accounts: &[String], usernames: &[String]) -> Result<()> {
                     account, username
                 );
 
-                let new_pass = PasswordGenerator::interactive_mode().expect("new password");
+                let new_pass = interactive_mode().expect("new password");
 
                 existing_cred.update_pass(new_pass);
 
@@ -76,7 +76,7 @@ fn add_new_creds(account: &str, username: &str, new_credentials: &mut Credential
         "Adding new credential for account: {}, username: {}",
         account, username
     );
-    let password = PasswordGenerator::interactive_mode().expect("interactive pass not to fail");
+    let password = interactive_mode().expect("interactive pass not to fail");
 
     new_credentials.insert(
         (account.to_string(), username.to_string()),

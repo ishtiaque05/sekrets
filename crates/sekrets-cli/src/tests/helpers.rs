@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::Write;
 use tempfile::NamedTempFile;
 
-use crate::secrets::password_generator::prompt_user_password;
+use crate::interactive::prompt_user_password;
 use sekrets_core::encryption::encryptor::encrypt_file;
 use serde_json;
 

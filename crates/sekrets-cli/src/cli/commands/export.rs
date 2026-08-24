@@ -2,7 +2,7 @@ use std::path::Path;
 
 use anyhow::Result;
 
-use crate::secrets::password_generator::prompt_user_password;
+use crate::interactive::prompt_user_password;
 use sekrets_core::encryption::decryptor::decrypt_file;
 use sekrets_core::encryption::encryptor::ENCRYPTED_FILENAME;
 use sekrets_core::helpers::directories::get_encrypted_file_path;
