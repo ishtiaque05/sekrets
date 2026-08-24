@@ -50,3 +50,68 @@ fn test_migrate_legacy_format() {
     expect_pred!(migrate_result.is_ok());
     expect_that!(vault.needs_migration(), eq(false));
 }
+
+#[googletest::test]
+fn test_add_then_search_finds_by_account_or_username() {
+    let mut vault = Vault::create(TEST_PASSWORD).expect("create should succeed");
+    vault.add("github", "alice", "hunter2").expect("add should succeed");
+
+    expect_that!(vault.search("git").len(), eq(1));
+    expect_that!(vault.search("alice").len(), eq(1));
+    expect_that!(vault.search("nonexistent").len(), eq(0));
+    expect_that!(vault.search("").len(), eq(1));
+}
+
+#[googletest::test]
+fn test_add_duplicate_returns_already_exists() {
+    let mut vault = Vault::create(TEST_PASSWORD).expect("create should succeed");
+    vault.add("github", "alice", "hunter2").expect("first add should succeed");
+
+    let result = vault.add("github", "alice", "different");
+    expect_that!(
+        result,
+        err(matches_pattern!(VaultError::AccountAlreadyExists { .. }))
+    );
+}
+
+#[googletest::test]
+fn test_update_missing_returns_not_found() {
+    let mut vault = Vault::create(TEST_PASSWORD).expect("create should succeed");
+    let result = vault.update("github", "alice", "new-password");
+    expect_that!(
+        result,
+        err(matches_pattern!(VaultError::AccountWithUsernameNotFound { .. }))
+    );
+}
+
+#[googletest::test]
+fn test_update_existing_changes_password_and_records_history() {
+    let mut vault = Vault::create(TEST_PASSWORD).expect("create should succeed");
+    vault.add("github", "alice", "old-password").expect("add should succeed");
+
+    vault.update("github", "alice", "new-password").expect("update should succeed");
+
+    let creds = vault.search("github");
+    expect_that!(creds[0].password, eq("new-password"));
+    expect_that!(creds[0].history.len(), eq(1));
+    expect_that!(creds[0].history[0].password, eq("old-password"));
+}
+
+#[googletest::test]
+fn test_delete_missing_returns_not_found() {
+    let mut vault = Vault::create(TEST_PASSWORD).expect("create should succeed");
+    let result = vault.delete("github", "alice");
+    expect_that!(
+        result,
+        err(matches_pattern!(VaultError::AccountWithUsernameNotFound { .. }))
+    );
+}
+
+#[googletest::test]
+fn test_delete_existing_removes_it() {
+    let mut vault = Vault::create(TEST_PASSWORD).expect("create should succeed");
+    vault.add("github", "alice", "hunter2").expect("add should succeed");
+
+    vault.delete("github", "alice").expect("delete should succeed");
+    expect_that!(vault.search("github").len(), eq(0));
+}

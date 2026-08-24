@@ -8,6 +8,7 @@ use crate::encryption::{
 };
 use crate::helpers::directories::get_encrypted_file_path;
 use crate::secrets::credential_manager::CredentialManager;
+use crate::secrets::credentials::Credential;
 use crate::types::{CredentialError, FileError};
 
 #[derive(Error, Debug)]
@@ -100,6 +101,60 @@ impl Vault {
         self.manager.migrate()?;
         self.manager.needs_migration = false;
         Ok(())
+    }
+
+    pub fn search(&self, query: &str) -> Vec<&Credential> {
+        if query.is_empty() {
+            return self.manager.credentials.values().collect();
+        }
+        let q = query.to_lowercase();
+        self.manager
+            .credentials
+            .values()
+            .filter(|c| c.account.to_lowercase().contains(&q) || c.username.to_lowercase().contains(&q))
+            .collect()
+    }
+
+    pub fn add(&mut self, account: &str, username: &str, password: &str) -> Result<(), VaultError> {
+        let key = (account.to_string(), username.to_string());
+        if self.manager.credentials.contains_key(&key) {
+            return Err(VaultError::AccountAlreadyExists {
+                account: account.to_string(),
+                username: username.to_string(),
+            });
+        }
+        self.manager.credentials.insert(
+            key,
+            Credential::new(account.to_string(), username.to_string(), password.to_string()),
+        );
+        self.save()
+    }
+
+    pub fn update(&mut self, account: &str, username: &str, new_password: &str) -> Result<(), VaultError> {
+        let cred = self
+            .manager
+            .find_creds(account, username)
+            .ok_or_else(|| VaultError::AccountWithUsernameNotFound {
+                account: account.to_string(),
+                username: username.to_string(),
+            })?;
+        cred.update_pass(new_password.to_string());
+        self.save()
+    }
+
+    pub fn delete(&mut self, account: &str, username: &str) -> Result<(), VaultError> {
+        let key = (account.to_string(), username.to_string());
+        if self.manager.credentials.remove(&key).is_none() {
+            return Err(VaultError::AccountWithUsernameNotFound {
+                account: account.to_string(),
+                username: username.to_string(),
+            });
+        }
+        self.save()
+    }
+
+    pub fn save(&self) -> Result<(), VaultError> {
+        self.manager.save_credentials().map_err(VaultError::from)
     }
 }
 
