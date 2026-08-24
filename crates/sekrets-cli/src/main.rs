@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
-use sekrets::cli::{run, Cli};
+use sekrets_cli::cli::{run, Cli};
 
 fn main() -> Result<()> {
     let cli = Cli::parse();

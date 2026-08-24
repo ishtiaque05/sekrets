@@ -77,7 +77,7 @@ gen-cov:
 
 install-deb:
 	cargo clean
-	cargo deb
+	cargo deb -p sekrets-cli
 	sudo dpkg -i $(shell ls -t target/debian/sekrets_*.deb | head -n 1)
 
 

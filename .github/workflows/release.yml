@@ -75,7 +75,7 @@ jobs:
           echo "EOF" >> $GITHUB_ENV
 
       - name: Build Debian Package
-        run: cargo deb --deb-version "$LIB_VERSION"
+        run: cargo deb -p sekrets-cli --deb-version "$LIB_VERSION"
 
       - name: Build Release Binary
         run: cargo build --release
