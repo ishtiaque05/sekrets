@@ -1,8 +1,6 @@
-use crate::{
-    secrets::credential_manager::CredentialManager,
-    secrets::password_generator::{prompt_user_password, PasswordGenerator},
-};
+use crate::secrets::password_generator::{prompt_user_password, PasswordGenerator};
 use anyhow::Result;
+use sekrets_core::secrets::credential_manager::CredentialManager;
 
 pub fn handle_update(account: String, username: String) -> Result<()> {
     let password = prompt_user_password();

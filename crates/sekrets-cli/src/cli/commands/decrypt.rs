@@ -1,8 +1,7 @@
 use anyhow::Result;
 
-use crate::secrets::{
-    credential_manager::CredentialManager, password_generator::prompt_user_password,
-};
+use crate::secrets::password_generator::prompt_user_password;
+use sekrets_core::secrets::credential_manager::CredentialManager;
 
 pub fn handle_decrypt(accounts: &[String], usernames: &[String], history: bool) -> Result<()> {
     if usernames.is_empty() {

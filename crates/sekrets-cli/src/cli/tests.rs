@@ -6,13 +6,15 @@ use tempfile::TempDir;
 
 use crate::{
     cli::commands::*,
+    secrets::password_generator::{prompt_user_password, PasswordGenerationError},
+    tests::helpers::{create_temp_plaintext_file, make_encrypted_file},
+};
+use sekrets_core::{
     encryption::{
         decryptor::{self, decrypt_file},
         encryptor::{encrypt_file, ENCRYPTED_FILENAME},
     },
     helpers::directories::get_encrypted_file_path,
-    secrets::password_generator::{prompt_user_password, PasswordGenerationError},
-    tests::helpers::{create_temp_plaintext_file, make_encrypted_file},
 };
 
 #[googletest::test]

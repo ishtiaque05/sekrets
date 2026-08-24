@@ -1,15 +1,16 @@
 use crate::{
     cli::commands::util::confirm_interactive_pass_mode,
+    secrets::password_generator::{prompt_user_password, PasswordGenerator},
+};
+use anyhow::Result;
+use sekrets_core::{
     encryption::encryptor::ENCRYPTED_FILENAME,
     helpers::directories::get_encrypted_file_path,
     secrets::{
-        credential_file_parser::CredentialHashMap,
-        credential_manager::CredentialManager,
+        credential_file_parser::CredentialHashMap, credential_manager::CredentialManager,
         credentials::Credential,
-        password_generator::{prompt_user_password, PasswordGenerator},
     },
 };
-use anyhow::Result;
 
 pub fn handle_append(accounts: &[String], usernames: &[String]) -> Result<()> {
     if accounts.len() != usernames.len() {

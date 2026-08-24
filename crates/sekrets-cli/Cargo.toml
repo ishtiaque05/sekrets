@@ -28,15 +28,10 @@ maintainer-scripts = "../../debian/"
 [dependencies]
 clap = { version = "4.5.30", features = ["derive"] }
 anyhow = "1.0.82"
-aes-gcm = "0.10"
 thiserror = "2.0.11"
-argon2 = "0.5"
 rand = "0.8.5"
-base64 = "0.13"
-rpassword = "7.0"
-dirs = "5.0"
 zxcvbn = "2.2"
-memorable-wordlist = "0.1.7"
+rpassword = "7.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
@@ -44,6 +39,7 @@ reqwest = { version = "0.12", features = ["blocking", "json"] }
 flate2 = "1.0"
 tar = "0.4"
 tempfile = "3.5"
+sekrets-core = { path = "../sekrets-core" }
 
 [dev-dependencies]
 googletest = "0.13"
@@ -51,3 +47,4 @@ assert_cmd = "2.0"
 tempfile = "3.5"
 predicates = "2.1"
 temp-env = "0.2"
+sekrets-core = { path = "../sekrets-core", features = ["test-utils"] }

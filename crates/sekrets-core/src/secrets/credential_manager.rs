@@ -108,8 +108,7 @@ impl CredentialManager {
 
         let current_path = get_encrypted_file_path(encryption::encryptor::ENCRYPTED_FILENAME);
         if current_path.exists() {
-            version_manager::snapshot_current(&current_path)
-                .map_err(|e| FileError::FileWriteError(e.to_string()))?;
+            version_manager::snapshot_current(&current_path)?;
         }
 
         self.save_credentials()

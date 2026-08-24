@@ -1,3 +1,3 @@
 [workspace]
-members = ["crates/sekrets-cli"]
+members = ["crates/sekrets-core", "crates/sekrets-cli"]
 resolver = "2"

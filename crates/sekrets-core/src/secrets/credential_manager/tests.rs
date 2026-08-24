@@ -1,7 +1,6 @@
 use super::*;
 use crate::encryption::{decryptor::decrypt_file, encryptor::ENCRYPTED_FILENAME};
-use crate::secrets::password_generator::prompt_user_password;
-use crate::tests::helpers::{make_encrypted_file, make_encrypted_jsonl_file};
+use crate::tests::helpers::{make_encrypted_file, make_encrypted_jsonl_file, TEST_PASSWORD};
 use crate::{helpers::directories::get_encrypted_file_path, secrets::credentials::Credential};
 use googletest::prelude::*;
 use serde_json;
@@ -152,7 +151,7 @@ fn test_successful_credential_parsing() {
     let account = "my_account".to_string();
 
     let _ = make_encrypted_file("my_account - username: user123, password: pass456\nanother_account - username: other, password: secret");
-    let credential = CredentialManager::new(prompt_user_password()).expect("not to fail");
+    let credential = CredentialManager::new(TEST_PASSWORD.to_string()).expect("not to fail");
     let result = credential.find_any_creds_with(None, account.clone());
 
     expect_pred!(result.is_ok());
@@ -168,7 +167,7 @@ fn test_account_not_found() {
     let account = "unknown_account".to_string();
 
     let _ = make_encrypted_file("my_account - username: user123, password: pass456");
-    let credential = CredentialManager::new(prompt_user_password()).expect("not to fail");
+    let credential = CredentialManager::new(TEST_PASSWORD.to_string()).expect("not to fail");
     let result = credential.find_any_creds_with(None, account.clone());
 
     expect_that!(
@@ -182,7 +181,7 @@ fn test_malformed_credentials() {
     let account = "my_account".to_string();
 
     let _ = make_encrypted_file("my_account - username user123, password pass456");
-    let credential = CredentialManager::new(prompt_user_password()).expect("not to fail");
+    let credential = CredentialManager::new(TEST_PASSWORD.to_string()).expect("not to fail");
     let result = credential.find_any_creds_with(None, account.clone());
 
     expect_that!(
@@ -201,7 +200,7 @@ fn test_multiple_accounts() {
                 account3 - username: user3, password: pass3";
 
     let _ = make_encrypted_file(data);
-    let credential = CredentialManager::new(prompt_user_password()).expect("not to fail");
+    let credential = CredentialManager::new(TEST_PASSWORD.to_string()).expect("not to fail");
     let result = credential.find_any_creds_with(None, account.clone());
 
     expect_pred!(result.is_ok());
@@ -233,7 +232,7 @@ fn test_username_account_match() {
                 account3 - username: user3, password: pass3";
 
     let _ = make_encrypted_file(data);
-    let credential = CredentialManager::new(prompt_user_password()).expect("not to fail");
+    let credential = CredentialManager::new(TEST_PASSWORD.to_string()).expect("not to fail");
     let result = credential.find_any_creds_with(Some("user2".to_string()), account.clone());
 
     expect_pred!(result.is_ok());
@@ -259,7 +258,7 @@ fn test_username_doesnot_match() {
                 account3 - username: user3, password: pass3";
 
     let _ = make_encrypted_file(data);
-    let credential = CredentialManager::new(prompt_user_password()).expect("not to fail");
+    let credential = CredentialManager::new(TEST_PASSWORD.to_string()).expect("not to fail");
     let result = credential.find_any_creds_with(Some("foo".to_string()), account.clone());
 
     expect_that!(
@@ -275,7 +274,7 @@ fn test_loading_legacy_format_triggers_migration_flag() {
     let data = "github - username: foo, password: bar\nbank - username: baz, password: secret";
     let _ = make_encrypted_file(data);
 
-    let manager = CredentialManager::new(prompt_user_password()).expect("not to fail");
+    let manager = CredentialManager::new(TEST_PASSWORD.to_string()).expect("not to fail");
 
     expect_that!(manager.credentials.len(), eq(2));
     expect_that!(manager.needs_migration, eq(true));
@@ -290,7 +289,7 @@ fn test_loading_jsonl_format_no_migration() {
     )];
     let _ = make_encrypted_jsonl_file(&creds);
 
-    let manager = CredentialManager::new(prompt_user_password()).expect("not to fail");
+    let manager = CredentialManager::new(TEST_PASSWORD.to_string()).expect("not to fail");
 
     expect_that!(manager.credentials.len(), eq(1));
     expect_that!(manager.needs_migration, eq(false));

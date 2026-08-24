@@ -2,10 +2,10 @@ use std::path::Path;
 
 use anyhow::Result;
 
-use crate::encryption::decryptor::decrypt_file;
-use crate::encryption::encryptor::ENCRYPTED_FILENAME;
-use crate::helpers::directories::get_encrypted_file_path;
 use crate::secrets::password_generator::prompt_user_password;
+use sekrets_core::encryption::decryptor::decrypt_file;
+use sekrets_core::encryption::encryptor::ENCRYPTED_FILENAME;
+use sekrets_core::helpers::directories::get_encrypted_file_path;
 
 use super::util::confirm_overwrite;
 

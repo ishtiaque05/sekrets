@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use crate::{
+use sekrets_core::{
     encryption::{decryptor, encryptor},
     helpers::directories::get_encrypted_file_path,
     secrets::version_manager,

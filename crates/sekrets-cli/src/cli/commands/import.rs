@@ -1,7 +1,7 @@
 use anyhow::Result;
 use std::path::Path;
 
-use crate::{
+use sekrets_core::{
     encryption::{decryptor, encryptor},
     helpers::directories::get_encrypted_file_path,
     secrets::{credential_file_parser::CredentialFileParser, version_manager},

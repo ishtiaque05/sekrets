@@ -1,5 +1,5 @@
-use crate::secrets::credential_manager::CredentialManager;
 use anyhow::Result;
+use sekrets_core::secrets::credential_manager::CredentialManager;
 
 /// Prompt for a password, returning the entered string.
 /// In test mode, reads from USER_TEST_PASS env var or defaults to "foo".

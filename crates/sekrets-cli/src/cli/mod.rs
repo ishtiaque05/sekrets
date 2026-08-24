@@ -101,7 +101,7 @@ pub enum Commands {
 }
 
 pub fn run(cli: Cli) -> Result<()> {
-    crate::helpers::directories::ensure_dirs();
+    sekrets_core::helpers::directories::ensure_dirs();
 
     if cli.update {
         return commands::self_update::handle_self_update();

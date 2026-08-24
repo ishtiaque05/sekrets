@@ -1,0 +1,26 @@
+[package]
+name = "sekrets-core"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["Syed Ishtiaque Ahmad <ishtiaque05@gmail.com>"]
+description = "Core encryption and credential-storage logic for sekrets"
+
+[features]
+test-utils = ["dep:tempfile"]
+
+[dependencies]
+aes-gcm = "0.10"
+argon2 = "0.5"
+rand = "0.8.5"
+thiserror = "2.0.11"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+zxcvbn = "2.2"
+dirs = "5.0"
+tempfile = { version = "3.5", optional = true }
+
+[dev-dependencies]
+googletest = "0.13"
+tempfile = "3.5"

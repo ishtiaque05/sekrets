@@ -2,9 +2,10 @@ use std::fs::File;
 use std::io::Write;
 use tempfile::NamedTempFile;
 
-use crate::secrets::password_generator::prompt_user_password;
-use sekrets_core::encryption::encryptor::encrypt_file;
+use crate::encryption::encryptor::encrypt_file;
 use serde_json;
+
+pub const TEST_PASSWORD: &str = "foo";
 
 pub fn create_temp_plaintext_file(content: &str) -> NamedTempFile {
     let temp_file = NamedTempFile::new().expect("Failed to create temp file");
@@ -20,15 +21,10 @@ pub fn create_temp_plaintext_file(content: &str) -> NamedTempFile {
 
 pub fn make_encrypted_file(content: &str) -> String {
     let file_path = create_temp_plaintext_file(content);
-
-    let pass = prompt_user_password();
-    encrypt_file(file_path.path().to_str().unwrap(), &pass).expect("Failed to encrypt file")
+    encrypt_file(file_path.path().to_str().unwrap(), TEST_PASSWORD).expect("Failed to encrypt file")
 }
 
-/// Creates an encrypted file with JSONL content from Credential structs.
-pub fn make_encrypted_jsonl_file(
-    credentials: &[sekrets_core::secrets::credentials::Credential],
-) -> String {
+pub fn make_encrypted_jsonl_file(credentials: &[crate::secrets::credentials::Credential]) -> String {
     let jsonl = credentials
         .iter()
         .map(|c| serde_json::to_string(c).unwrap())

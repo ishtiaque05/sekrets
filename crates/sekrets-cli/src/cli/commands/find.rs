@@ -1,7 +1,6 @@
-use crate::secrets::{
-    credential_manager::CredentialManager, password_generator::prompt_user_password,
-};
+use crate::secrets::password_generator::prompt_user_password;
 use anyhow::Result;
+use sekrets_core::secrets::credential_manager::CredentialManager;
 
 pub fn account(account: String) -> Result<()> {
     let master_pass = prompt_user_password();
