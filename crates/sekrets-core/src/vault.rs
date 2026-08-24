@@ -10,6 +10,7 @@ use crate::helpers::directories::get_encrypted_file_path;
 use crate::secrets::credential_manager::CredentialManager;
 use crate::secrets::credentials::Credential;
 use crate::secrets::credentials::HistoryEntry;
+use crate::secrets::version_manager::{self, VersionInfo};
 use crate::types::{CredentialError, FileError};
 
 #[derive(Error, Debug)]
@@ -172,6 +173,35 @@ impl Vault {
     pub fn change_master_password(&mut self, new_password: &str) -> Result<(), VaultError> {
         self.manager.set_master_password(new_password.to_string());
         self.save()
+    }
+
+    pub fn list_versions(&self) -> Result<Vec<VersionInfo>, VaultError> {
+        version_manager::list_versions().map_err(VaultError::from)
+    }
+
+    pub fn switch_version(&mut self, n: usize, version_password: &str) -> Result<(), VaultError> {
+        let version_path = version_manager::get_version_file_path(n);
+        if !version_path.exists() {
+            return Err(VaultError::FileNotFound(version_path));
+        }
+
+        let version_path_str = version_path
+            .to_str()
+            .ok_or_else(|| VaultError::Io("invalid version path".to_string()))?
+            .to_string();
+        let version_data = decryptor::decrypt_file(&version_path_str, version_password)?;
+
+        let current_path = get_encrypted_file_path(ENCRYPTED_FILENAME);
+        if current_path.exists() {
+            version_manager::snapshot_current(&current_path)?;
+        }
+
+        let current_master_password = self.manager.master_password().to_string();
+        encryptor::encrypt_text(&version_data, &current_master_password)?;
+
+        let refreshed = Vault::unlock(&current_master_password)?;
+        *self = refreshed;
+        Ok(())
     }
 }
 

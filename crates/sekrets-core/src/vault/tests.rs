@@ -155,3 +155,60 @@ fn test_change_master_password_then_old_password_fails_to_unlock() {
     expect_pred!(new_unlock.is_ok());
     expect_that!(new_unlock.unwrap().search("github").len(), eq(1));
 }
+
+#[googletest::test]
+fn test_list_versions_empty_for_fresh_vault() {
+    let vault = Vault::create(TEST_PASSWORD).expect("create should succeed");
+    let versions = vault.list_versions().expect("list_versions should succeed");
+    expect_that!(versions.len(), eq(0));
+}
+
+#[googletest::test]
+fn test_switch_version_missing_returns_file_not_found() {
+    let mut vault = Vault::create(TEST_PASSWORD).expect("create should succeed");
+    let result = vault.switch_version(1, TEST_PASSWORD);
+    expect_that!(result, err(matches_pattern!(VaultError::FileNotFound(_))));
+}
+
+#[googletest::test]
+fn test_switch_version_roundtrip() {
+    use crate::helpers::directories::get_encrypted_file_path;
+    use crate::encryption::encryptor::ENCRYPTED_FILENAME;
+    use crate::secrets::version_manager::snapshot_current;
+
+    let mut vault = Vault::create(TEST_PASSWORD).expect("create should succeed");
+    vault.add("old-account", "alice", "hunter2").expect("add should succeed");
+
+    // Seed a version snapshot of this state, encrypted under TEST_PASSWORD.
+    let current_path = get_encrypted_file_path(ENCRYPTED_FILENAME);
+    snapshot_current(&current_path).expect("snapshot should succeed");
+
+    // Now change the vault so it no longer matches the snapshot.
+    vault.delete("old-account", "alice").expect("delete should succeed");
+    vault.add("new-account", "bob", "swordfish").expect("add should succeed");
+
+    vault
+        .switch_version(1, TEST_PASSWORD)
+        .expect("switch_version should succeed");
+
+    expect_that!(vault.search("old-account").len(), eq(1));
+    expect_that!(vault.search("new-account").len(), eq(0));
+
+    // Vault stays unlockable with the same (unchanged) master password after switching.
+    let reunlocked = Vault::unlock(TEST_PASSWORD);
+    expect_pred!(reunlocked.is_ok());
+}
+
+#[googletest::test]
+fn test_switch_version_wrong_version_password() {
+    use crate::helpers::directories::get_encrypted_file_path;
+    use crate::encryption::encryptor::ENCRYPTED_FILENAME;
+    use crate::secrets::version_manager::snapshot_current;
+
+    let mut vault = Vault::create(TEST_PASSWORD).expect("create should succeed");
+    let current_path = get_encrypted_file_path(ENCRYPTED_FILENAME);
+    snapshot_current(&current_path).expect("snapshot should succeed");
+
+    let result = vault.switch_version(1, "wrong-version-password");
+    expect_that!(result, err(matches_pattern!(VaultError::WrongPassword)));
+}
