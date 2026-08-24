@@ -10,7 +10,7 @@ use crate::{
     types::{CredentialError, FileError},
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CredentialManager {
     master_password: String,
     pub credentials: CredentialHashMap,

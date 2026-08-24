@@ -1,31 +1,19 @@
 mod screen;
 
-use iced::widget::text;
-use iced::{Element, Task};
-use screen::{Message, Screen, SekretsApp};
+use screen::SekretsApp;
 
 impl SekretsApp {
-    fn new() -> (Self, Task<Message>) {
-        let locate = Task::perform(async { sekrets_core::Vault::locate() }, Message::Located);
+    fn new() -> (Self, iced::Task<screen::Message>) {
+        let locate = iced::Task::perform(
+            async { sekrets_core::Vault::locate() },
+            screen::Message::Located,
+        );
         (
             SekretsApp {
-                screen: Some(Screen::Locating),
+                screen: Some(screen::Screen::Locating),
             },
             locate,
         )
-    }
-
-    fn view(&self) -> Element<'_, Message> {
-        match &self.screen {
-            Some(Screen::Locating) => text("Looking for your sekrets file...").into(),
-            Some(Screen::NoVaultFound { path }) => {
-                text(format!("No sekrets file found at {}", path.display())).into()
-            }
-            Some(Screen::Locked { path }) => {
-                text(format!("Found sekrets file at {}", path.display())).into()
-            }
-            None => text("").into(),
-        }
     }
 
     fn title(&self) -> String {

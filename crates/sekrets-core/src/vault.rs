@@ -13,7 +13,7 @@ use crate::secrets::credentials::HistoryEntry;
 use crate::secrets::version_manager::{self, VersionInfo};
 use crate::types::{CredentialError, FileError};
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone)]
 pub enum VaultError {
     #[error("No sekrets file found at {0}")]
     FileNotFound(PathBuf),
@@ -57,7 +57,7 @@ impl From<CredentialError> for VaultError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Vault {
     manager: CredentialManager,
 }
