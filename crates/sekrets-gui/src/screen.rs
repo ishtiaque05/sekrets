@@ -9,6 +9,10 @@ pub enum Screen {
     Locating,
     NoVaultFound {
         path: PathBuf,
+        password: String,
+        confirm: String,
+        error: Option<String>,
+        creating: bool,
     },
     // `path` is retained on `Locked` for future screens (e.g. displaying which
     // vault file is being unlocked); not yet read by this task's `view()`.
@@ -40,6 +44,10 @@ pub enum Message {
     PasswordChanged(String),
     UnlockSubmitted,
     UnlockCompleted(Result<Vault, VaultError>),
+    CreatePasswordChanged(String),
+    CreateConfirmChanged(String),
+    CreateSubmitted,
+    CreateCompleted(Result<Vault, VaultError>),
 }
 
 impl std::fmt::Debug for Screen {
@@ -69,7 +77,13 @@ impl SekretsApp {
                 let path = sekrets_core::helpers::directories::get_encrypted_file_path(
                     sekrets_core::encryption::encryptor::ENCRYPTED_FILENAME,
                 );
-                self.screen = Some(Screen::NoVaultFound { path });
+                self.screen = Some(Screen::NoVaultFound {
+                    path,
+                    password: String::new(),
+                    confirm: String::new(),
+                    error: None,
+                    creating: false,
+                });
                 Task::none()
             }
             Message::PasswordChanged(new_password) => {
@@ -115,14 +129,95 @@ impl SekretsApp {
                 }
                 Task::none()
             }
+            Message::CreatePasswordChanged(new_password) => {
+                if let Some(Screen::NoVaultFound { password, .. }) = &mut self.screen {
+                    *password = new_password;
+                }
+                Task::none()
+            }
+            Message::CreateConfirmChanged(new_confirm) => {
+                if let Some(Screen::NoVaultFound { confirm, .. }) = &mut self.screen {
+                    *confirm = new_confirm;
+                }
+                Task::none()
+            }
+            Message::CreateSubmitted => {
+                let password = match &mut self.screen {
+                    Some(Screen::NoVaultFound {
+                        password,
+                        confirm,
+                        error,
+                        creating,
+                        ..
+                    }) => {
+                        if password != confirm {
+                            *error = Some("Passwords don't match".to_string());
+                            return Task::none();
+                        }
+                        *creating = true;
+                        password.clone()
+                    }
+                    _ => return Task::none(),
+                };
+                Task::perform(
+                    async move { Vault::create(&password) },
+                    Message::CreateCompleted,
+                )
+            }
+            Message::CreateCompleted(Ok(vault)) => {
+                self.screen = Some(Screen::Unlocked {
+                    vault,
+                    view: UnlockedView::List {
+                        query: String::new(),
+                    },
+                    last_activity: Instant::now(),
+                });
+                Task::none()
+            }
+            Message::CreateCompleted(Err(err)) => {
+                if let Some(Screen::NoVaultFound {
+                    error, creating, ..
+                }) = &mut self.screen
+                {
+                    *error = Some(err.to_string());
+                    *creating = false;
+                }
+                Task::none()
+            }
         }
     }
 
     pub fn view(&self) -> Element<'_, Message> {
         match &self.screen {
             Some(Screen::Locating) => text("Looking for your sekrets file...").into(),
-            Some(Screen::NoVaultFound { path }) => {
-                text(format!("No sekrets file found at {}", path.display())).into()
+            Some(Screen::NoVaultFound {
+                path,
+                password,
+                confirm,
+                error,
+                creating,
+            }) => {
+                let mut col = column![
+                    text(format!("No sekrets file found at {}", path.display())),
+                    text("Choose a master password to create one:"),
+                    text_input("Master password", password)
+                        .on_input(Message::CreatePasswordChanged)
+                        .secure(true),
+                    text_input("Confirm master password", confirm)
+                        .on_input(Message::CreateConfirmChanged)
+                        .secure(true),
+                    button(if *creating {
+                        "Creating..."
+                    } else {
+                        "Create vault"
+                    })
+                    .on_press(Message::CreateSubmitted),
+                ]
+                .spacing(10);
+                if let Some(err) = error {
+                    col = col.push(text(err));
+                }
+                col.into()
             }
             Some(Screen::Locked {
                 password,
@@ -234,5 +329,45 @@ mod tests {
             }
             _ => panic!("expected Locked screen"),
         }
+    }
+
+    #[test]
+    fn create_submitted_with_mismatched_confirm_shows_error_without_calling_vault() {
+        let mut app = SekretsApp {
+            screen: Some(Screen::NoVaultFound {
+                path: PathBuf::from("/tmp/sekrets.enc"),
+                password: "hunter2".to_string(),
+                confirm: "different".to_string(),
+                error: None,
+                creating: false,
+            }),
+        };
+        let _ = app.update(Message::CreateSubmitted);
+        match &app.screen {
+            Some(Screen::NoVaultFound {
+                error, creating, ..
+            }) => {
+                assert!(error.is_some());
+                assert!(!creating);
+            }
+            _ => panic!("expected NoVaultFound screen"),
+        }
+    }
+
+    #[test]
+    fn create_completed_success_transitions_to_unlocked() {
+        let mut app = SekretsApp {
+            screen: Some(Screen::NoVaultFound {
+                path: PathBuf::from("/tmp/sekrets.enc"),
+                password: "hunter2".to_string(),
+                confirm: "hunter2".to_string(),
+                error: None,
+                creating: true,
+            }),
+        };
+        sekrets_core::Vault::create("hunter2").expect("create should succeed");
+        let vault = sekrets_core::Vault::unlock("hunter2").expect("unlock should succeed");
+        let _ = app.update(Message::CreateCompleted(Ok(vault)));
+        assert!(matches!(app.screen, Some(Screen::Unlocked { .. })));
     }
 }
