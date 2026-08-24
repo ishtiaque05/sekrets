@@ -1,0 +1,18 @@
+[package]
+name = "sekrets-gui"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["Syed Ishtiaque Ahmad <ishtiaque05@gmail.com>"]
+description = "Desktop GUI for sekrets"
+
+[[bin]]
+name = "sekrets-gui"
+path = "src/main.rs"
+
+[dependencies]
+iced = "0.13.1"
+sekrets-core = { path = "../sekrets-core" }
+
+[dev-dependencies]
+sekrets-core = { path = "../sekrets-core", features = ["test-utils"] }
