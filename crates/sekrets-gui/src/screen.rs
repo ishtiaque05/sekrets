@@ -31,6 +31,9 @@ pub enum Screen {
         view: UnlockedView,
         last_activity: Instant,
     },
+    MigrationPrompt {
+        vault: Vault,
+    },
 }
 
 #[allow(dead_code)]
@@ -48,6 +51,23 @@ pub enum Message {
     CreateConfirmChanged(String),
     CreateSubmitted,
     CreateCompleted(Result<Vault, VaultError>),
+    MigrateAccepted,
+    MigrateDeclined,
+    MigrateCompleted(Vault, Result<(), VaultError>),
+}
+
+fn enter_unlocked_or_migration(vault: Vault) -> Screen {
+    if vault.needs_migration() {
+        Screen::MigrationPrompt { vault }
+    } else {
+        Screen::Unlocked {
+            vault,
+            view: UnlockedView::List {
+                query: String::new(),
+            },
+            last_activity: Instant::now(),
+        }
+    }
 }
 
 impl std::fmt::Debug for Screen {
@@ -110,13 +130,7 @@ impl SekretsApp {
                 )
             }
             Message::UnlockCompleted(Ok(vault)) => {
-                self.screen = Some(Screen::Unlocked {
-                    vault,
-                    view: UnlockedView::List {
-                        query: String::new(),
-                    },
-                    last_activity: Instant::now(),
-                });
+                self.screen = Some(enter_unlocked_or_migration(vault));
                 Task::none()
             }
             Message::UnlockCompleted(Err(err)) => {
@@ -165,13 +179,7 @@ impl SekretsApp {
                 )
             }
             Message::CreateCompleted(Ok(vault)) => {
-                self.screen = Some(Screen::Unlocked {
-                    vault,
-                    view: UnlockedView::List {
-                        query: String::new(),
-                    },
-                    last_activity: Instant::now(),
-                });
+                self.screen = Some(enter_unlocked_or_migration(vault));
                 Task::none()
             }
             Message::CreateCompleted(Err(err)) => {
@@ -182,6 +190,52 @@ impl SekretsApp {
                     *error = Some(err.to_string());
                     *creating = false;
                 }
+                Task::none()
+            }
+            Message::MigrateAccepted => {
+                let vault = match self.screen.take() {
+                    Some(Screen::MigrationPrompt { vault }) => vault,
+                    other => {
+                        self.screen = other;
+                        return Task::none();
+                    }
+                };
+                Task::perform(
+                    async move {
+                        let mut vault = vault;
+                        let result = vault.migrate();
+                        (vault, result)
+                    },
+                    |(vault, result)| Message::MigrateCompleted(vault, result),
+                )
+            }
+            Message::MigrateDeclined => {
+                if let Some(Screen::MigrationPrompt { vault }) = self.screen.take() {
+                    self.screen = Some(Screen::Unlocked {
+                        vault,
+                        view: UnlockedView::List {
+                            query: String::new(),
+                        },
+                        last_activity: Instant::now(),
+                    });
+                }
+                Task::none()
+            }
+            Message::MigrateCompleted(vault, _result) => {
+                // Migration failure: the in-memory vault is still usable even if the
+                // backup/persist step failed, so proceed to Unlocked rather than strand
+                // the user on a dead-end screen. `needs_migration()` correctly stays
+                // true on failure (Vault::migrate's `?` short-circuits before clearing
+                // the flag), so the user is re-prompted on their next full unlock. A
+                // future iteration could surface the failure as a banner in the List
+                // view instead of silently proceeding.
+                self.screen = Some(Screen::Unlocked {
+                    vault,
+                    view: UnlockedView::List {
+                        query: String::new(),
+                    },
+                    last_activity: Instant::now(),
+                });
                 Task::none()
             }
         }
@@ -241,6 +295,16 @@ impl SekretsApp {
                 col.into()
             }
             Some(Screen::Unlocked { .. }) => text("Unlocked").into(),
+            Some(Screen::MigrationPrompt { .. }) => column![
+                text("Your sekrets file uses an older format."),
+                text(
+                    "It will be upgraded to the new format. A backup of your current file will be saved first."
+                ),
+                button("Upgrade now").on_press(Message::MigrateAccepted),
+                button("Not now").on_press(Message::MigrateDeclined),
+            ]
+            .spacing(10)
+            .into(),
             None => text("").into(),
         }
     }
@@ -368,6 +432,63 @@ mod tests {
         sekrets_core::Vault::create("hunter2").expect("create should succeed");
         let vault = sekrets_core::Vault::unlock("hunter2").expect("unlock should succeed");
         let _ = app.update(Message::CreateCompleted(Ok(vault)));
+        assert!(matches!(app.screen, Some(Screen::Unlocked { .. })));
+    }
+
+    #[test]
+    fn unlock_completed_with_needs_migration_shows_migration_prompt() {
+        let mut app = SekretsApp {
+            screen: Some(Screen::Locked {
+                path: PathBuf::from("/tmp/sekrets.enc"),
+                password: "foo".to_string(),
+                error: None,
+                unlocking: true,
+            }),
+        };
+        sekrets_core::encryption::encryptor::encrypt_text(
+            "github - username: foo, password: bar",
+            "foo",
+        )
+        .expect("encrypt_text should succeed");
+        let vault = sekrets_core::Vault::unlock("foo").expect("unlock should succeed");
+        assert!(vault.needs_migration());
+
+        let _ = app.update(Message::UnlockCompleted(Ok(vault)));
+        assert!(matches!(app.screen, Some(Screen::MigrationPrompt { .. })));
+    }
+
+    #[test]
+    fn migrate_declined_goes_to_unlocked_without_migrating() {
+        let vault = sekrets_core::Vault::create("hunter2").expect("create should succeed");
+        let mut app = SekretsApp {
+            screen: Some(Screen::MigrationPrompt { vault }),
+        };
+
+        let _ = app.update(Message::MigrateDeclined);
+        match &app.screen {
+            Some(Screen::Unlocked { vault, .. }) => assert!(!vault.needs_migration()),
+            _ => panic!("expected Unlocked screen"),
+        }
+    }
+
+    #[test]
+    fn migrate_accepted_then_completed_reaches_unlocked_even_on_migrate_error() {
+        let vault = sekrets_core::Vault::create("hunter2").expect("create should succeed");
+        let mut app = SekretsApp {
+            screen: Some(Screen::MigrationPrompt { vault }),
+        };
+        // Simulate the async round-trip directly: construct the completion message
+        // with an Err result and confirm the screen still recovers to Unlocked.
+        let vault_after = match app.screen.take() {
+            Some(Screen::MigrationPrompt { vault }) => vault,
+            _ => panic!("expected MigrationPrompt"),
+        };
+        let _ = app.update(Message::MigrateCompleted(
+            vault_after,
+            Err(sekrets_core::VaultError::Corrupt(
+                "simulated failure".to_string(),
+            )),
+        ));
         assert!(matches!(app.screen, Some(Screen::Unlocked { .. })));
     }
 }
