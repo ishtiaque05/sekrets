@@ -30,6 +30,7 @@ pub enum Screen {
         vault: Vault,
         view: UnlockedView,
         last_activity: Instant,
+        clipboard_copied_at: Option<Instant>,
     },
     MigrationPrompt {
         vault: Vault,
@@ -64,6 +65,21 @@ pub enum Message {
     MigrateCompleted(Vault, Result<(), VaultError>),
     SearchChanged(String),
     CredentialSelected(String, String),
+    RevealToggled,
+    CopyPassword(String),
+}
+
+/// Returns true once `delay` has elapsed since `copied_at`, as measured against `now`.
+/// Pure helper so it can be unit-tested without driving the app's async runtime; the
+/// actual clearing (calling `iced::clipboard::write(String::new())`) is wired into
+/// Task H1's `Message::Tick` handler, which will call this alongside the auto-lock check.
+#[allow(dead_code)]
+pub fn should_clear_clipboard(
+    copied_at: Instant,
+    now: Instant,
+    delay: std::time::Duration,
+) -> bool {
+    now.duration_since(copied_at) >= delay
 }
 
 fn enter_unlocked_or_migration(vault: Vault) -> Screen {
@@ -76,6 +92,7 @@ fn enter_unlocked_or_migration(vault: Vault) -> Screen {
                 query: String::new(),
             },
             last_activity: Instant::now(),
+            clipboard_copied_at: None,
         }
     }
 }
@@ -227,6 +244,7 @@ impl SekretsApp {
                             query: String::new(),
                         },
                         last_activity: Instant::now(),
+                        clipboard_copied_at: None,
                     });
                 }
                 Task::none()
@@ -245,6 +263,7 @@ impl SekretsApp {
                         query: String::new(),
                     },
                     last_activity: Instant::now(),
+                    clipboard_copied_at: None,
                 });
                 Task::none()
             }
@@ -274,6 +293,30 @@ impl SekretsApp {
                     *last_activity = Instant::now();
                 }
                 Task::none()
+            }
+            Message::RevealToggled => {
+                if let Some(Screen::Unlocked {
+                    view: UnlockedView::Detail { revealed, .. },
+                    last_activity,
+                    ..
+                }) = &mut self.screen
+                {
+                    *revealed = !*revealed;
+                    *last_activity = Instant::now();
+                }
+                Task::none()
+            }
+            Message::CopyPassword(password) => {
+                if let Some(Screen::Unlocked {
+                    last_activity,
+                    clipboard_copied_at,
+                    ..
+                }) = &mut self.screen
+                {
+                    *last_activity = Instant::now();
+                    *clipboard_copied_at = Some(Instant::now());
+                }
+                iced::clipboard::write(password)
             }
         }
     }
@@ -352,9 +395,33 @@ impl SekretsApp {
                 list.into()
             }
             Some(Screen::Unlocked {
-                view: UnlockedView::Detail { .. },
+                vault,
+                view: UnlockedView::Detail { key, revealed },
                 ..
-            }) => text("Detail").into(),
+            }) => {
+                let creds = vault.search(&key.0);
+                let cred = creds.iter().find(|c| c.username == key.1);
+                match cred {
+                    Some(cred) => {
+                        let password_display = if *revealed {
+                            cred.password.clone()
+                        } else {
+                            "••••••••".to_string()
+                        };
+                        column![
+                            text(format!("{} — {}", cred.account, cred.username)),
+                            text(password_display),
+                            button(if *revealed { "Hide" } else { "Reveal" })
+                                .on_press(Message::RevealToggled),
+                            button("Copy password")
+                                .on_press(Message::CopyPassword(cred.password.clone())),
+                        ]
+                        .spacing(10)
+                        .into()
+                    }
+                    None => text("Credential not found").into(),
+                }
+            }
             Some(Screen::MigrationPrompt { .. }) => column![
                 text("Your sekrets file uses an older format."),
                 text(
@@ -541,6 +608,7 @@ mod tests {
                     query: String::new(),
                 },
                 last_activity: Instant::now(),
+                clipboard_copied_at: None,
             }),
         };
         let _ = app.update(Message::SearchChanged("git".to_string()));
@@ -574,5 +642,51 @@ mod tests {
             )),
         ));
         assert!(matches!(app.screen, Some(Screen::Unlocked { .. })));
+    }
+
+    #[test]
+    fn reveal_toggled_flips_revealed_flag() {
+        let vault = sekrets_core::Vault::create("hunter2").expect("create should succeed");
+        let mut app = SekretsApp {
+            screen: Some(Screen::Unlocked {
+                vault,
+                view: UnlockedView::Detail {
+                    key: ("github".to_string(), "alice".to_string()),
+                    revealed: false,
+                },
+                last_activity: Instant::now(),
+                clipboard_copied_at: None,
+            }),
+        };
+        let _ = app.update(Message::RevealToggled);
+        match &app.screen {
+            Some(Screen::Unlocked {
+                view: UnlockedView::Detail { revealed, .. },
+                ..
+            }) => {
+                assert!(revealed)
+            }
+            _ => panic!("expected Detail view"),
+        }
+    }
+
+    #[test]
+    fn should_clear_clipboard_true_after_delay_elapsed() {
+        let copied_at = Instant::now() - std::time::Duration::from_secs(31);
+        assert!(should_clear_clipboard(
+            copied_at,
+            Instant::now(),
+            std::time::Duration::from_secs(30)
+        ));
+    }
+
+    #[test]
+    fn should_clear_clipboard_false_before_delay_elapsed() {
+        let copied_at = Instant::now();
+        assert!(!should_clear_clipboard(
+            copied_at,
+            Instant::now(),
+            std::time::Duration::from_secs(30)
+        ));
     }
 }
