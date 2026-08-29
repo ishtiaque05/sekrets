@@ -427,10 +427,16 @@ impl SekretsApp {
                             if old_account == account && old_username == username {
                                 vault.update(account, username, password)
                             } else {
-                                // Renaming account/username: delete the old key, add the new one.
+                                // Renaming account/username: add the new key first, then
+                                // delete the old one. This ordering matters: if `add` fails
+                                // (e.g. the new account/username collides with a different
+                                // existing credential), the original credential is left
+                                // untouched. If `delete` somehow fails after a successful
+                                // `add`, the worst case is a harmless duplicate entry rather
+                                // than permanent data loss.
                                 vault
-                                    .delete(old_account, old_username)
-                                    .and_then(|_| vault.add(account, username, password))
+                                    .add(account, username, password)
+                                    .and_then(|_| vault.delete(old_account, old_username))
                             }
                         }
                     };
@@ -929,6 +935,133 @@ mod tests {
             }) => {
                 assert!(error.is_some());
                 assert_eq!(account, "github"); // input preserved, not discarded
+            }
+            _ => panic!("expected to stay on Edit view with an error"),
+        }
+    }
+
+    #[test]
+    fn edit_submitted_same_key_updates_password_and_returns_to_list() {
+        let mut vault = sekrets_core::Vault::create(TEST_PASSWORD).expect("create should succeed");
+        vault
+            .add("github", "alice", "oldpass")
+            .expect("add should succeed");
+
+        let mut app = SekretsApp {
+            screen: Some(Screen::Unlocked {
+                vault,
+                view: UnlockedView::Edit {
+                    key: Some(("github".to_string(), "alice".to_string())),
+                    account: "github".to_string(),
+                    username: "alice".to_string(),
+                    password: "newpass".to_string(),
+                    error: None,
+                },
+                last_activity: Instant::now(),
+                clipboard_copied_at: None,
+            }),
+        };
+        let _ = app.update(Message::EditSubmitted);
+        match &app.screen {
+            Some(Screen::Unlocked {
+                view: UnlockedView::List { .. },
+                vault,
+                ..
+            }) => {
+                let creds = vault.search("github");
+                assert_eq!(creds.len(), 1);
+                assert_eq!(creds[0].password, "newpass");
+            }
+            _ => panic!("expected List view after successful update"),
+        }
+    }
+
+    #[test]
+    fn edit_submitted_rename_success_moves_credential_to_new_key() {
+        let mut vault = sekrets_core::Vault::create(TEST_PASSWORD).expect("create should succeed");
+        vault
+            .add("github", "alice", "secret")
+            .expect("add should succeed");
+
+        let mut app = SekretsApp {
+            screen: Some(Screen::Unlocked {
+                vault,
+                view: UnlockedView::Edit {
+                    key: Some(("github".to_string(), "alice".to_string())),
+                    account: "gitlab".to_string(),
+                    username: "alice2".to_string(),
+                    password: "secret".to_string(),
+                    error: None,
+                },
+                last_activity: Instant::now(),
+                clipboard_copied_at: None,
+            }),
+        };
+        let _ = app.update(Message::EditSubmitted);
+        match &app.screen {
+            Some(Screen::Unlocked {
+                view: UnlockedView::List { .. },
+                vault,
+                ..
+            }) => {
+                assert!(vault.search("github").iter().all(|c| c.username != "alice"));
+                let new_creds = vault.search("gitlab");
+                assert_eq!(new_creds.len(), 1);
+                assert_eq!(new_creds[0].username, "alice2");
+            }
+            _ => panic!("expected List view after successful rename"),
+        }
+    }
+
+    #[test]
+    fn edit_submitted_rename_collision_preserves_original_credential() {
+        let mut vault = sekrets_core::Vault::create(TEST_PASSWORD).expect("create should succeed");
+        vault
+            .add("github", "alice", "secret")
+            .expect("add should succeed");
+        vault
+            .add("gitlab", "bob", "other-secret")
+            .expect("add should succeed");
+
+        let mut app = SekretsApp {
+            screen: Some(Screen::Unlocked {
+                vault,
+                // Renaming github/alice onto gitlab/bob, which already exists: the add
+                // should fail with AccountAlreadyExists, and the original github/alice
+                // credential must remain untouched (regression test for the
+                // delete-then-add data-loss bug: add-then-delete ordering means the
+                // failed `add` never reaches the `delete` step).
+                view: UnlockedView::Edit {
+                    key: Some(("github".to_string(), "alice".to_string())),
+                    account: "gitlab".to_string(),
+                    username: "bob".to_string(),
+                    password: "hijacked".to_string(),
+                    error: None,
+                },
+                last_activity: Instant::now(),
+                clipboard_copied_at: None,
+            }),
+        };
+        let _ = app.update(Message::EditSubmitted);
+        match &app.screen {
+            Some(Screen::Unlocked {
+                view: UnlockedView::Edit { error, .. },
+                vault,
+                ..
+            }) => {
+                assert!(error.is_some());
+                let original = vault
+                    .search("github")
+                    .into_iter()
+                    .find(|c| c.username == "alice")
+                    .expect("original github/alice credential must still exist");
+                assert_eq!(original.password, "secret");
+                let untouched = vault
+                    .search("gitlab")
+                    .into_iter()
+                    .find(|c| c.username == "bob")
+                    .expect("original gitlab/bob credential must still exist");
+                assert_eq!(untouched.password, "other-secret");
             }
             _ => panic!("expected to stay on Edit view with an error"),
         }
