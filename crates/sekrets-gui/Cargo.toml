@@ -23,6 +23,16 @@ sekrets-core = { path = "../sekrets-core" }
 [dev-dependencies]
 sekrets-core = { path = "../sekrets-core", features = ["test-utils"] }
 
+[package.metadata.deb]
+maintainer = "Syed Ishtiaque Ahmad <ishtiaque05@gmail.com>"
+depends = "libc6 (>= 2.28)"
+priority = "optional"
+section = "utils"
+assets = [
+    ["target/release/sekrets-gui", "/usr/local/bin/", "755"]
+]
+maintainer-scripts = "../../debian-gui/"
+
 [package.metadata.bundle]
 name = "Sekrets"
 identifier = "com.ishtiaque05.sekrets-gui"
