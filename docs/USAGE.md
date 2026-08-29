@@ -154,3 +154,63 @@ sekrets --update
 - Checks GitHub Releases for a newer version.
 - Downloads and replaces the binary.
 - If installed to a system path, run with `sudo sekrets --update`.
+
+## GUI Usage
+
+Sekrets also ships a desktop GUI (`sekrets-gui`) that operates on the same
+`sekrets.enc` file as the CLI. See the [README](../README.md#gui) for
+installation instructions.
+
+### Unlocking
+
+On launch, the GUI locates your existing `sekrets.enc` file and prompts for
+your master password in a masked entry field. If you enter the wrong
+password, an error is shown inline on the unlock screen and you can try
+again.
+
+### Searching
+
+Once unlocked, a live filter box narrows the credential list as you type.
+The vault is decrypted once at unlock time and kept in memory, so filtering
+searches that already-decrypted list rather than re-decrypting on every
+keystroke.
+
+### Viewing a Credential
+
+Selecting a credential shows its details with the password masked by
+default. A reveal toggle shows the plaintext password, and a copy button
+places it on the clipboard. The clipboard is cleared automatically about 25
+seconds after a copy, so you don't need to clear it yourself.
+
+### Adding, Editing, and Deleting Credentials
+
+Adding and editing credentials use a form with inline validation errors —
+if a save fails (for example, a duplicate account/username pair), the error
+is shown on the form and your input is preserved, not discarded. A
+"Generate password" button fills in a random password and shows a live
+strength indicator next to it; the indicator is advisory only and never
+blocks saving. Deleting a credential asks for confirmation before removing
+it.
+
+### Password History
+
+Each credential keeps up to 5 previous passwords. History is shown masked,
+with a timestamp for when each password was set.
+
+### Changing the Master Password
+
+The GUI can re-encrypt the entire vault under a new master password from a
+dedicated screen, without dropping to the command line.
+
+### Listing and Switching File Versions
+
+The GUI can list the file-level snapshots Sekrets keeps and switch to an
+older one. Switching to a previous version asks for *that version's own*
+password — which may be different from your current master password if it
+has been changed since that snapshot was taken.
+
+### Auto-Lock
+
+For safety, the GUI locks itself after 5 minutes of inactivity, dropping
+the decrypted vault from memory and returning you to the unlock screen.
+You'll need to enter your master password again to continue.
