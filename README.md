@@ -36,8 +36,19 @@ credentials without the command line.
 
 ### Install
 
-**macOS:** download `Sekrets.app` from the latest release and drag it into
-`/Applications`, or build it yourself:
+**Linux (Debian/Ubuntu):** download the GUI `.deb` from the
+[latest release](https://github.com/ishtiaque05/sekrets/releases) and install it:
+
+```sh
+sudo dpkg -i sekrets-gui_<RELEASE_VERSION>_amd64.deb
+sekrets-gui
+```
+
+The release tarball (`sekrets-linux.tar.gz`) also contains the prebuilt
+`sekrets-gui` binary alongside the `sekrets` CLI.
+
+**macOS:** releases don't currently ship a prebuilt `Sekrets.app`, so build the
+bundle yourself and drag it into `/Applications`:
 
 ```sh
 cargo install cargo-bundle
@@ -45,19 +56,15 @@ cargo bundle -p sekrets-gui --release
 open target/release/bundle/osx/Sekrets.app
 ```
 
-**Linux (Debian/Ubuntu):**
+**Linux (other distros):** releases don't currently ship a prebuilt
+`.AppImage` either — build one yourself with the bundled script. It needs
+[`appimagetool`](https://github.com/AppImage/AppImageKit/releases) on your
+`PATH` and ImageMagick's `convert` for the icon:
 
 ```sh
-sudo dpkg -i sekrets-gui_<RELEASE_VERSION>_amd64.deb
-sekrets-gui
-```
-
-**Linux (other distros):** download the `.AppImage` from the latest
-release, make it executable, and run it:
-
-```sh
-chmod +x sekrets-gui-*.AppImage
-./sekrets-gui-*.AppImage
+./scripts/build-appimage.sh
+chmod +x target/appimage/sekrets-gui-*.AppImage
+./target/appimage/sekrets-gui-*.AppImage
 ```
 
 The GUI reads and writes the same `sekrets.enc` file as the CLI (`~/.local/share/sekrets/encrypted/sekrets.enc`), so both can be used interchangeably on the same machine.

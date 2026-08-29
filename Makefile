@@ -81,6 +81,11 @@ install-deb:
 	sudo dpkg -i $(shell ls -t target/debian/sekrets_*.deb | head -n 1)
 
 
+install-deb-gui:
+	cargo deb -p sekrets-gui
+	sudo dpkg -i $(shell ls -t target/debian/sekrets-gui_*.deb | head -n 1)
+
+
 clippy:
 	cargo clippy --all --all-targets --all-features -- -D warnings
 
@@ -89,4 +94,4 @@ fmt_check:
 
 lint: clippy fmt_check
 
-.PHONY: all build install uninstall clean gen-cov install-deb clippy fmt_check
+.PHONY: all build install uninstall clean gen-cov install-deb install-deb-gui clippy fmt_check lint
