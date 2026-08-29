@@ -17,7 +17,7 @@ use crate::types::{CredentialError, FileError};
 pub enum VaultError {
     #[error("No sekrets file found at {0}")]
     FileNotFound(PathBuf),
-    #[error("Incorrect master password")]
+    #[error("Incorrect master password (or the file's contents have been altered)")]
     WrongPassword,
     #[error("Sekrets file is corrupt: {0}")]
     Corrupt(String),
@@ -31,17 +31,34 @@ pub enum VaultError {
     Io(String),
 }
 
+/// Maps low-level `FileError`s onto the `VaultError` surface the GUI/CLI match on.
+///
+/// The distinction that matters here is *structural damage* versus a *bad key*:
+///
+/// - `CorruptFile` / `InvalidCiphertext` are detected without ever needing the right key
+///   (an unreadable salt line, a body too short to hold the AEAD tag, a malformed tag), so
+///   they are unambiguously corruption. Reporting these as `WrongPassword` left users
+///   retyping a correct password forever against a damaged file.
+/// - `DecryptionError` is only reachable *after* the AEAD tag verified — the key was
+///   correct and the plaintext is still garbage — so it is corruption too.
+/// - The key-derivation failures are internal faults of the KDF/cipher setup, unrelated to
+///   whether the entered password was right; they surface as `Io` rather than pretending
+///   to be a password judgement.
+/// - `EncryptionError` carries the AEAD tag mismatch, which is genuinely ambiguous between
+///   a wrong password and bit-rot in the ciphertext. `WrongPassword` stays the default
+///   there, and its message hints at the other possibility.
 impl From<FileError> for VaultError {
     fn from(err: FileError) -> Self {
         match err {
-            FileError::InvalidCiphertext(msg) => VaultError::Corrupt(msg),
+            FileError::CorruptFile(msg)
+            | FileError::InvalidCiphertext(msg)
+            | FileError::DecryptionError(msg) => VaultError::Corrupt(msg),
             FileError::FileReadError(msg) | FileError::FileWriteError(msg) => VaultError::Io(msg),
-            FileError::HashingError(_)
-            | FileError::InvalidHashOutput(_)
-            | FileError::InvalidNonceSize(_)
-            | FileError::EncryptionError(_)
-            | FileError::DecryptionError(_)
-            | FileError::KeyGenerationError(_) => VaultError::WrongPassword,
+            FileError::HashingError(msg)
+            | FileError::InvalidHashOutput(msg)
+            | FileError::InvalidNonceSize(msg)
+            | FileError::KeyGenerationError(msg) => VaultError::Io(msg),
+            FileError::EncryptionError(_) => VaultError::WrongPassword,
         }
     }
 }

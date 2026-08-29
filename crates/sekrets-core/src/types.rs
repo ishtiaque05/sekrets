@@ -20,6 +20,12 @@ pub enum FileError {
     InvalidCiphertext(String),
     #[error("Decryption Error: {0}")]
     DecryptionError(String),
+    /// Structural damage to the sekrets file that is detectable *without* a correct key —
+    /// e.g. a salt line that isn't valid base64, or a body too short to even contain the
+    /// AEAD tag. Unlike an authentication-tag mismatch, these are unambiguously NOT
+    /// "wrong password" conditions, so they must not be reported as one.
+    #[error("Corrupt sekrets file: {0}")]
+    CorruptFile(String),
 }
 
 #[derive(Debug, thiserror::Error)]

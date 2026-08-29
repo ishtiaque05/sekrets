@@ -246,3 +246,74 @@ fn test_switch_version_wrong_version_password() {
     let result = vault.switch_version(1, "wrong-version-password");
     expect_that!(result, err(matches_pattern!(VaultError::WrongPassword)));
 }
+
+#[googletest::test]
+fn test_unlock_corrupt_salt_line_reports_corrupt_not_wrong_password() {
+    use crate::encryption::encryptor::ENCRYPTED_FILENAME;
+    use crate::helpers::directories::get_encrypted_file_path;
+
+    Vault::create(TEST_PASSWORD).expect("create should succeed");
+    let path = get_encrypted_file_path(ENCRYPTED_FILENAME);
+    std::fs::write(&path, b"%%%not-a-valid-salt%%%\nsome ciphertext bytes here")
+        .expect("corrupt the vault file");
+
+    let result = Vault::unlock(TEST_PASSWORD);
+
+    // Regression test for `VaultError::Corrupt` being dead code: every decrypt failure —
+    // including a structurally damaged file — used to surface as `WrongPassword`, so a
+    // user with a corrupt vault retyped a correct password forever.
+    expect_that!(result, err(matches_pattern!(VaultError::Corrupt(_))));
+}
+
+#[googletest::test]
+fn test_unlock_truncated_file_reports_corrupt_not_wrong_password() {
+    use crate::encryption::encryptor::ENCRYPTED_FILENAME;
+    use crate::helpers::directories::get_encrypted_file_path;
+
+    Vault::create(TEST_PASSWORD).expect("create should succeed");
+    let path = get_encrypted_file_path(ENCRYPTED_FILENAME);
+    let contents = std::fs::read(&path).expect("read vault file");
+    let newline = contents
+        .iter()
+        .position(|b| *b == b'\n')
+        .expect("salt line");
+    let mut truncated = contents[..=newline].to_vec();
+    truncated.extend_from_slice(b"short");
+    std::fs::write(&path, truncated).expect("truncate the vault file");
+
+    let result = Vault::unlock(TEST_PASSWORD);
+
+    expect_that!(result, err(matches_pattern!(VaultError::Corrupt(_))));
+}
+
+#[googletest::test]
+fn test_file_error_mapping_separates_corruption_from_wrong_password() {
+    use crate::types::FileError;
+
+    expect_that!(
+        VaultError::from(FileError::CorruptFile("damaged".to_string())),
+        matches_pattern!(VaultError::Corrupt(_))
+    );
+    expect_that!(
+        VaultError::from(FileError::InvalidCiphertext("bad tag".to_string())),
+        matches_pattern!(VaultError::Corrupt(_))
+    );
+    expect_that!(
+        VaultError::from(FileError::DecryptionError("not utf-8".to_string())),
+        matches_pattern!(VaultError::Corrupt(_))
+    );
+    // The AEAD tag mismatch remains the (ambiguous) wrong-password signal.
+    expect_that!(
+        VaultError::from(FileError::EncryptionError("tag mismatch".to_string())),
+        matches_pattern!(VaultError::WrongPassword)
+    );
+    // Key-derivation faults are internal, never a judgement about the entered password.
+    expect_that!(
+        VaultError::from(FileError::KeyGenerationError("kdf".to_string())),
+        matches_pattern!(VaultError::Io(_))
+    );
+    expect_that!(
+        VaultError::from(FileError::FileReadError("io".to_string())),
+        matches_pattern!(VaultError::Io(_))
+    );
+}

@@ -20,8 +20,15 @@ fn read_encrypted_file(filename: &str) -> Result<(SaltString, Vec<u8>), FileErro
         .read_line(&mut salt_base64)
         .map_err(|err| FileError::FileReadError(err.to_string()))?;
 
-    let salt = SaltString::from_b64(salt_base64.trim())
-        .map_err(|_| FileError::InvalidHashOutput("Invalid salt encoding".to_string()))?;
+    // A salt line that doesn't decode is structural damage to the file, detectable before
+    // any key is derived — it can never be caused by typing the wrong master password.
+    let salt = SaltString::from_b64(salt_base64.trim()).map_err(|_| {
+        FileError::CorruptFile(
+            "the salt line is missing or is not valid base64 — the file is damaged, not \
+             locked by a different password"
+                .to_string(),
+        )
+    })?;
 
     let mut encrypted_data = Vec::new();
 
@@ -61,10 +68,14 @@ fn decrypt_data(
     nonce: &[u8; 12],
     encrypted_data: &mut [u8],
 ) -> Result<String, FileError> {
+    // Too short to even contain the 16-byte authentication tag: the file was truncated.
+    // Also detectable without a key, so it is corruption rather than a wrong password.
     if encrypted_data.len() < 16 {
-        return Err(FileError::EncryptionError(
-            "Ciphertext too short".to_string(),
-        ));
+        return Err(FileError::CorruptFile(format!(
+            "the encrypted body is {} bytes, shorter than the 16-byte authentication tag — \
+             the file is truncated",
+            encrypted_data.len()
+        )));
     }
 
     let tag_start = encrypted_data.len() - 16;
@@ -77,8 +88,14 @@ fn decrypt_data(
     key.decrypt_in_place_detached(Nonce::from_slice(nonce), b"", ciphertext, &tag_bytes.into())
         .map_err(|err| FileError::EncryptionError(err.to_string()))?;
 
-    String::from_utf8(ciphertext.to_vec())
-        .map_err(|err| FileError::DecryptionError(err.to_string()))
+    // Reached only after the AEAD tag verified, i.e. the key was correct. Non-UTF-8
+    // plaintext at this point means the stored contents themselves are damaged.
+    String::from_utf8(ciphertext.to_vec()).map_err(|err| {
+        FileError::DecryptionError(format!(
+            "contents decrypted and authenticated successfully but are not valid UTF-8: {}",
+            err
+        ))
+    })
 }
 
 pub fn decrypt_file(filename: &str, password: &str) -> Result<String, FileError> {
