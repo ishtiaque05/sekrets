@@ -1,4 +1,4 @@
-use crate::helpers::directories::get_versions_path;
+use crate::helpers::directories::{ensure_dir, get_versions_path};
 use crate::types::FileError;
 use std::fs;
 use std::path::PathBuf;
@@ -20,6 +20,9 @@ pub fn get_version_file_path(n: usize) -> PathBuf {
 /// Rotates versions: drops v1, shifts v2→v1, ..., saves current as v5 (or next available slot).
 pub fn snapshot_current(current_file: &std::path::Path) -> Result<(), FileError> {
     let versions_dir = get_versions_path();
+    // `get_versions_path` is a pure query; the only writer creates the directory, and
+    // reports failure as a typed error rather than panicking.
+    ensure_dir(&versions_dir)?;
 
     let next_slot =
         (1..=MAX_VERSIONS).find(|i| !versions_dir.join(format!("sekrets.v{}.enc", i)).exists());

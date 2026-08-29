@@ -9,8 +9,11 @@ fn test_snapshot_creates_v1_when_no_versions() {
     let source = versions_dir.parent().unwrap().join("test_source.enc");
     fs::write(&source, "current file content").unwrap();
 
+    // Deliberately does NOT pre-create `versions_dir`: `get_versions_path` is a pure
+    // query, so `snapshot_current` must create the directory itself.
     snapshot_current(&source).unwrap();
 
+    expect_that!(versions_dir.is_dir(), eq(true));
     let v1 = versions_dir.join("sekrets.v1.enc");
     expect_that!(v1.exists(), eq(true));
     expect_that!(fs::read_to_string(&v1).unwrap(), eq("current file content"));
@@ -19,6 +22,7 @@ fn test_snapshot_creates_v1_when_no_versions() {
 #[googletest::test]
 fn test_snapshot_rotates_when_full() {
     let versions_dir = get_versions_path();
+    fs::create_dir_all(&versions_dir).unwrap();
     let source = versions_dir.parent().unwrap().join("test_source2.enc");
 
     // Create 5 existing versions
@@ -42,6 +46,7 @@ fn test_snapshot_rotates_when_full() {
 #[googletest::test]
 fn test_list_versions_returns_sorted() {
     let versions_dir = get_versions_path();
+    fs::create_dir_all(&versions_dir).unwrap();
 
     for i in 1..=3 {
         let path = versions_dir.join(format!("sekrets.v{}.enc", i));

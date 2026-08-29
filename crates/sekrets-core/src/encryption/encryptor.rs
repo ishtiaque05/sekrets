@@ -1,4 +1,7 @@
-use crate::{helpers::directories::get_encrypted_file_path, types::FileError};
+use crate::{
+    helpers::directories::{ensure_parent_dir, get_encrypted_file_path},
+    types::FileError,
+};
 use aes_gcm::{
     aead::{AeadInPlace, KeyInit},
     Aes256Gcm, Nonce,
@@ -10,6 +13,7 @@ use argon2::{
 use rand::rngs::OsRng;
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
+use std::path::Path;
 
 pub const ENCRYPTED_FILENAME: &str = "sekrets.enc";
 
@@ -62,6 +66,10 @@ fn encrypt_data(
 }
 
 fn write_encrypted_file(filepath: &str, salt: &SaltString, data: &[u8]) -> Result<(), FileError> {
+    // The path builders are pure queries, so the writer owns creating the directory it
+    // writes into. Failure here is reported as a typed `FileError`, never a panic.
+    ensure_parent_dir(Path::new(filepath))?;
+
     let mut file = OpenOptions::new()
         .write(true)
         .create(true)
