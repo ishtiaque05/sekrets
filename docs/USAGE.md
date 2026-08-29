@@ -161,6 +161,15 @@ Sekrets also ships a desktop GUI (`sekrets-gui`) that operates on the same
 `sekrets.enc` file as the CLI. See the [README](../README.md#gui) for
 installation instructions.
 
+### Running the GUI
+
+- **Installed via `.deb`, `.app`, or `.AppImage`:** launch it the way you'd
+  launch any desktop app — `sekrets-gui` from a terminal (Linux `.deb`
+  install), or open `Sekrets.app`/the AppImage file directly.
+- **From a repo checkout, without installing anything:** run
+  `cargo run -p sekrets-gui` from the project root. See the README's
+  [Run from source](../README.md#run-from-source) section for details.
+
 ### Unlocking
 
 On launch, the GUI locates your existing `sekrets.enc` file and prompts for

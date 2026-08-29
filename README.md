@@ -67,6 +67,21 @@ chmod +x target/appimage/sekrets-gui-*.AppImage
 ./target/appimage/sekrets-gui-*.AppImage
 ```
 
+### Run from source
+
+If you have the repo checked out and Rust installed, you don't need to
+install a package at all — just build and run the GUI crate directly:
+
+```sh
+cargo run -p sekrets-gui
+```
+
+The first run compiles `sekrets-gui` and its dependencies (a minute or two);
+subsequent runs are fast. Use `cargo run -p sekrets-gui --release` for a
+faster-running (but slower-to-compile) optimized build. This launches the
+same window as the installed app, reading/writing the same `sekrets.enc`
+file as any other install method described above.
+
 The GUI reads and writes the same `sekrets.enc` file as the CLI (`~/.local/share/sekrets/encrypted/sekrets.enc`), so both can be used interchangeably on the same machine.
 
 ## Uninstallation
