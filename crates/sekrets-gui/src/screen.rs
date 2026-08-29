@@ -5,6 +5,10 @@ use iced::widget::{button, column, row, text, text_input};
 use iced::{Element, Task};
 use sekrets_core::{Vault, VaultError, VersionInfo};
 
+// Exactly one `Screen` exists for the lifetime of the app (it *is* the app state), so the
+// size spread between variants costs a couple of hundred bytes once — boxing fields to
+// even it out would only add indirection and pattern-matching noise to every handler.
+#[allow(clippy::large_enum_variant)]
 pub enum Screen {
     Locating,
     NoVaultFound {
@@ -23,17 +27,27 @@ pub enum Screen {
         error: Option<VaultError>,
         unlocking: bool,
     },
-    // Fields consumed by Task D5 (migration) and Phase E (list view), not yet
-    // read by this task.
-    #[allow(dead_code)]
     Unlocked {
         vault: Vault,
         view: UnlockedView,
         last_activity: Instant,
-        clipboard_copied_at: Option<Instant>,
+        /// The password most recently copied to the clipboard, and when. Retained (rather
+        /// than just the timestamp) so the delayed clear can read the clipboard back and
+        /// only wipe it if the user hasn't copied something else in the meantime.
+        clipboard_copied_at: Option<(Instant, String)>,
     },
+    /// Holds a decrypted `Vault`, so it carries `last_activity` and auto-locks exactly
+    /// like `Unlocked` — a user can otherwise sit on this prompt indefinitely.
     MigrationPrompt {
         vault: Vault,
+        last_activity: Instant,
+    },
+    /// The window while the async migration is in flight. The `Vault` lives inside the
+    /// pending future rather than in the screen, but the app is still effectively unlocked,
+    /// so this screen keeps ticking and can auto-lock too (see `Message::MigrateCompleted`,
+    /// which drops the returned vault if the app locked while it was working).
+    Migrating {
+        last_activity: Instant,
     },
 }
 
@@ -106,9 +120,18 @@ pub enum Message {
     ChangeMpConfirmChanged(String),
     ChangeMpSubmitted,
     NavigateToVersions,
+    NavigateToList,
     SwitchVersionPasswordChanged(String),
     SwitchVersionRequested(usize),
     SwitchVersionCompleted(Result<(), VaultError>),
+    /// Result of reading the clipboard back once the auto-clear delay elapsed.
+    /// `expected` is what this app put there; `current` is what is on the clipboard now.
+    /// They differ when the user copied something else in the meantime, in which case
+    /// nothing is wiped.
+    ClipboardCheckedForClear {
+        expected: String,
+        current: Option<String>,
+    },
     Tick,
 }
 
@@ -142,16 +165,33 @@ pub fn should_lock(last_activity: Instant, now: Instant, timeout: std::time::Dur
 
 fn enter_unlocked_or_migration(vault: Vault) -> Screen {
     if vault.needs_migration() {
-        Screen::MigrationPrompt { vault }
-    } else {
-        Screen::Unlocked {
+        Screen::MigrationPrompt {
             vault,
-            view: UnlockedView::List {
-                query: String::new(),
-            },
             last_activity: Instant::now(),
-            clipboard_copied_at: None,
         }
+    } else {
+        unlocked_list(vault)
+    }
+}
+
+fn unlocked_list(vault: Vault) -> Screen {
+    Screen::Unlocked {
+        vault,
+        view: UnlockedView::List {
+            query: String::new(),
+        },
+        last_activity: Instant::now(),
+        clipboard_copied_at: None,
+    }
+}
+
+/// The screen shown when the app auto-locks: the `Vault` is dropped by moving out of it.
+fn locked_screen() -> Screen {
+    Screen::Locked {
+        path: Vault::locate().unwrap_or_default(),
+        password: String::new(),
+        error: None,
+        unlocking: false,
     }
 }
 
@@ -168,9 +208,17 @@ pub struct SekretsApp {
 
 impl SekretsApp {
     pub fn update(&mut self, message: Message) -> Task<Message> {
-        if !matches!(message, Message::Tick) {
-            if let Some(Screen::Unlocked { last_activity, .. }) = &mut self.screen {
-                *last_activity = Instant::now();
+        // `Tick` and the timer-driven clipboard read-back are not user activity, so they
+        // must not postpone the idle auto-lock.
+        if !matches!(
+            message,
+            Message::Tick | Message::ClipboardCheckedForClear { .. }
+        ) {
+            match &mut self.screen {
+                Some(Screen::Unlocked { last_activity, .. })
+                | Some(Screen::MigrationPrompt { last_activity, .. })
+                | Some(Screen::Migrating { last_activity }) => *last_activity = Instant::now(),
+                _ => {}
             }
         }
         match message {
@@ -284,12 +332,17 @@ impl SekretsApp {
             }
             Message::MigrateAccepted => {
                 let vault = match self.screen.take() {
-                    Some(Screen::MigrationPrompt { vault }) => vault,
+                    Some(Screen::MigrationPrompt { vault, .. }) => vault,
                     other => {
                         self.screen = other;
                         return Task::none();
                     }
                 };
+                // A real screen (rather than `None`) so the subscription keeps ticking
+                // and the app can still auto-lock while the migration runs.
+                self.screen = Some(Screen::Migrating {
+                    last_activity: Instant::now(),
+                });
                 Task::perform(
                     async move {
                         let mut vault = vault;
@@ -300,19 +353,18 @@ impl SekretsApp {
                 )
             }
             Message::MigrateDeclined => {
-                if let Some(Screen::MigrationPrompt { vault }) = self.screen.take() {
-                    self.screen = Some(Screen::Unlocked {
-                        vault,
-                        view: UnlockedView::List {
-                            query: String::new(),
-                        },
-                        last_activity: Instant::now(),
-                        clipboard_copied_at: None,
-                    });
+                if let Some(Screen::MigrationPrompt { vault, .. }) = self.screen.take() {
+                    self.screen = Some(unlocked_list(vault));
                 }
                 Task::none()
             }
             Message::MigrateCompleted(vault, _result) => {
+                // If the app auto-locked while the migration was in flight, honour that:
+                // dropping `vault` here is what actually discards the decrypted secrets
+                // the pending future was holding.
+                if !matches!(self.screen, Some(Screen::Migrating { .. })) {
+                    return Task::none();
+                }
                 // Migration failure: the in-memory vault is still usable even if the
                 // backup/persist step failed, so proceed to Unlocked rather than strand
                 // the user on a dead-end screen. `needs_migration()` correctly stays
@@ -320,14 +372,7 @@ impl SekretsApp {
                 // the flag), so the user is re-prompted on their next full unlock. A
                 // future iteration could surface the failure as a banner in the List
                 // view instead of silently proceeding.
-                self.screen = Some(Screen::Unlocked {
-                    vault,
-                    view: UnlockedView::List {
-                        query: String::new(),
-                    },
-                    last_activity: Instant::now(),
-                    clipboard_copied_at: None,
-                });
+                self.screen = Some(unlocked_list(vault));
                 Task::none()
             }
             Message::SearchChanged(new_query) => {
@@ -377,9 +422,17 @@ impl SekretsApp {
                 }) = &mut self.screen
                 {
                     *last_activity = Instant::now();
-                    *clipboard_copied_at = Some(Instant::now());
+                    *clipboard_copied_at = Some((Instant::now(), password.clone()));
                 }
                 iced::clipboard::write(password)
+            }
+            Message::NavigateToList => {
+                if let Some(Screen::Unlocked { view, .. }) = &mut self.screen {
+                    *view = UnlockedView::List {
+                        query: String::new(),
+                    };
+                }
+                Task::none()
             }
             Message::NavigateToAdd => {
                 if let Some(Screen::Unlocked {
@@ -677,38 +730,56 @@ impl SekretsApp {
                 }
                 Task::none()
             }
-            Message::Tick => {
-                if let Some(Screen::Unlocked {
-                    last_activity,
-                    clipboard_copied_at,
-                    ..
-                }) = &self.screen
-                {
-                    if should_lock(*last_activity, Instant::now(), AUTO_LOCK_TIMEOUT) {
-                        let path = Vault::locate().unwrap_or_default();
-                        self.screen = Some(Screen::Locked {
-                            path,
-                            password: String::new(),
-                            error: None,
-                            unlocking: false,
-                        });
-                        return Task::none();
-                    }
-                    if let Some(copied_at) = clipboard_copied_at {
-                        if should_clear_clipboard(*copied_at, Instant::now(), CLIPBOARD_CLEAR_DELAY)
-                        {
-                            if let Some(Screen::Unlocked {
-                                clipboard_copied_at,
-                                ..
-                            }) = &mut self.screen
-                            {
-                                *clipboard_copied_at = None;
-                            }
-                            return iced::clipboard::write(String::new());
-                        }
-                    }
+            Message::ClipboardCheckedForClear { expected, current } => {
+                // Only wipe if the clipboard still holds what this app put there — the
+                // user may have copied something unrelated in the meantime, and clobbering
+                // that is exactly what the spec forbids.
+                if current.as_deref() == Some(expected.as_str()) {
+                    return iced::clipboard::write(String::new());
                 }
                 Task::none()
+            }
+            Message::Tick => {
+                let now = Instant::now();
+
+                // Every screen that holds (or has in flight) a decrypted vault ticks.
+                let last_activity = match &self.screen {
+                    Some(Screen::Unlocked { last_activity, .. })
+                    | Some(Screen::MigrationPrompt { last_activity, .. })
+                    | Some(Screen::Migrating { last_activity }) => *last_activity,
+                    _ => return Task::none(),
+                };
+
+                if should_lock(last_activity, now, AUTO_LOCK_TIMEOUT) {
+                    self.screen = Some(locked_screen());
+                    return Task::none();
+                }
+
+                let expected = match &mut self.screen {
+                    Some(Screen::Unlocked {
+                        clipboard_copied_at,
+                        ..
+                    }) => match clipboard_copied_at {
+                        Some((copied_at, _))
+                            if should_clear_clipboard(*copied_at, now, CLIPBOARD_CLEAR_DELAY) =>
+                        {
+                            // Taken here so the read-back is issued exactly once.
+                            clipboard_copied_at.take().map(|(_, password)| password)
+                        }
+                        _ => None,
+                    },
+                    _ => None,
+                };
+
+                match expected {
+                    Some(expected) => iced::clipboard::read().map(move |current| {
+                        Message::ClipboardCheckedForClear {
+                            expected: expected.clone(),
+                            current,
+                        }
+                    }),
+                    None => Task::none(),
+                }
             }
         }
     }
@@ -819,6 +890,7 @@ impl SekretsApp {
                                 cred.account.clone(),
                                 cred.username.clone()
                             )),
+                            button("Back").on_press(Message::NavigateToList),
                             text("Password history:"),
                         ]
                         .spacing(10);
@@ -872,6 +944,7 @@ impl SekretsApp {
                     button("Generate password").on_press(Message::GeneratePassword),
                     text(strength),
                     button("Save").on_press(Message::EditSubmitted),
+                    button("Cancel").on_press(Message::NavigateToList),
                 ]
                 .spacing(10);
                 if let Some(err) = error {
@@ -915,6 +988,7 @@ impl SekretsApp {
                         .on_input(Message::ChangeMpConfirmChanged)
                         .secure(true),
                     button("Change password").on_press(Message::ChangeMpSubmitted),
+                    button("Cancel").on_press(Message::NavigateToList),
                 ]
                 .spacing(10);
                 if let Some(err) = error {
@@ -936,7 +1010,9 @@ impl SekretsApp {
                 for v in versions {
                     col = col.push(
                         row![
-                            text(format!("v{}", v.number)),
+                            // The modified time, not the number, is what identifies a
+                            // restore point: numbers shift on every snapshot rotation.
+                            text(format!("v{}  {}", v.number, v.format_modified_local())),
                             button("Switch to this version")
                                 .on_press(Message::SwitchVersionRequested(v.number)),
                         ]
@@ -948,10 +1024,14 @@ impl SekretsApp {
                         .on_input(Message::SwitchVersionPasswordChanged)
                         .secure(true),
                 );
+                col = col.push(button("Back").on_press(Message::NavigateToList));
                 if let Some(err) = error {
                     col = col.push(text(err.to_string()));
                 }
                 col.into()
+            }
+            Some(Screen::Migrating { .. }) => {
+                text("Upgrading your sekrets file...").into()
             }
             Some(Screen::MigrationPrompt { .. }) => column![
                 text("Your sekrets file uses an older format."),
@@ -973,6 +1053,43 @@ mod tests {
     use super::*;
 
     const TEST_PASSWORD: &str = "hunter2";
+
+    use futures::StreamExt;
+    use iced_runtime::task::into_stream;
+    use iced_runtime::Action;
+
+    /// Drives a real `iced::Task` to completion on a blocking executor and returns the
+    /// `Message`s it produced.
+    ///
+    /// This exercises the actual `Task`/future machinery rather than hand-constructing the
+    /// completion message: an executor that silently drops futures (which is exactly what
+    /// iced's "null" backend did here before the `tokio` feature was enabled) yields an
+    /// empty `Vec` and fails these tests.
+    ///
+    /// Only safe for tasks whose actions all resolve on their own. Tasks that ask the
+    /// windowing runtime a question — `iced::clipboard::read()` — park forever on a oneshot
+    /// channel nobody answers; use [`first_action`] for those.
+    fn drive_task(task: Task<Message>) -> Vec<Message> {
+        let Some(stream) = into_stream(task) else {
+            return Vec::new();
+        };
+        futures::executor::block_on(
+            stream
+                .filter_map(|action| async move {
+                    match action {
+                        Action::Output(message) => Some(message),
+                        _ => None,
+                    }
+                })
+                .collect::<Vec<_>>(),
+        )
+    }
+
+    /// The first runtime `Action` a task emits, without waiting for the rest of the stream.
+    fn first_action(task: Task<Message>) -> Option<Action<Message>> {
+        let stream = into_stream(task)?;
+        futures::executor::block_on(Box::pin(stream).next())
+    }
 
     #[test]
     fn locating_transitions_to_locked_when_vault_found() {
@@ -1121,7 +1238,10 @@ mod tests {
     fn migrate_declined_goes_to_unlocked_without_migrating() {
         let vault = sekrets_core::Vault::create("hunter2").expect("create should succeed");
         let mut app = SekretsApp {
-            screen: Some(Screen::MigrationPrompt { vault }),
+            screen: Some(Screen::MigrationPrompt {
+                vault,
+                last_activity: Instant::now(),
+            }),
         };
 
         let _ = app.update(Message::MigrateDeclined);
@@ -1157,24 +1277,79 @@ mod tests {
     }
 
     #[test]
-    fn migrate_accepted_then_completed_reaches_unlocked_even_on_migrate_error() {
+    fn migrate_completed_reaches_unlocked_even_on_migrate_error() {
         let vault = sekrets_core::Vault::create("hunter2").expect("create should succeed");
         let mut app = SekretsApp {
-            screen: Some(Screen::MigrationPrompt { vault }),
-        };
-        // Simulate the async round-trip directly: construct the completion message
-        // with an Err result and confirm the screen still recovers to Unlocked.
-        let vault_after = match app.screen.take() {
-            Some(Screen::MigrationPrompt { vault }) => vault,
-            _ => panic!("expected MigrationPrompt"),
+            screen: Some(Screen::Migrating {
+                last_activity: Instant::now(),
+            }),
         };
         let _ = app.update(Message::MigrateCompleted(
-            vault_after,
+            vault,
             Err(sekrets_core::VaultError::Corrupt(
                 "simulated failure".to_string(),
             )),
         ));
         assert!(matches!(app.screen, Some(Screen::Unlocked { .. })));
+    }
+
+    #[test]
+    fn migrate_accepted_moves_to_a_tickable_migrating_screen() {
+        // Regression test: this used to `screen.take()` and leave `screen: None`, which
+        // the subscription never ticks — an un-lockable window holding a decrypted vault
+        // in the pending future.
+        let vault = sekrets_core::Vault::create("hunter2").expect("create should succeed");
+        let mut app = SekretsApp {
+            screen: Some(Screen::MigrationPrompt {
+                vault,
+                last_activity: Instant::now(),
+            }),
+        };
+        let _ = app.update(Message::MigrateAccepted);
+        assert!(matches!(app.screen, Some(Screen::Migrating { .. })));
+    }
+
+    #[test]
+    fn tick_locks_migration_prompt_after_idle_timeout() {
+        let vault = sekrets_core::Vault::create(TEST_PASSWORD).expect("create should succeed");
+        let mut app = SekretsApp {
+            screen: Some(Screen::MigrationPrompt {
+                vault,
+                last_activity: Instant::now() - std::time::Duration::from_secs(301),
+            }),
+        };
+        let _ = app.update(Message::Tick);
+        assert!(matches!(app.screen, Some(Screen::Locked { .. })));
+    }
+
+    #[test]
+    fn tick_does_not_lock_a_recently_active_migration_prompt() {
+        let vault = sekrets_core::Vault::create(TEST_PASSWORD).expect("create should succeed");
+        let mut app = SekretsApp {
+            screen: Some(Screen::MigrationPrompt {
+                vault,
+                last_activity: Instant::now(),
+            }),
+        };
+        let _ = app.update(Message::Tick);
+        assert!(matches!(app.screen, Some(Screen::MigrationPrompt { .. })));
+    }
+
+    #[test]
+    fn tick_locks_during_migration_and_the_completion_does_not_reopen_the_vault() {
+        let vault = sekrets_core::Vault::create(TEST_PASSWORD).expect("create should succeed");
+        let mut app = SekretsApp {
+            screen: Some(Screen::Migrating {
+                last_activity: Instant::now() - std::time::Duration::from_secs(301),
+            }),
+        };
+        let _ = app.update(Message::Tick);
+        assert!(matches!(app.screen, Some(Screen::Locked { .. })));
+
+        // The in-flight migration finishes after the auto-lock: the returned vault must be
+        // dropped, not used to silently re-enter the unlocked app.
+        let _ = app.update(Message::MigrateCompleted(vault, Ok(())));
+        assert!(matches!(app.screen, Some(Screen::Locked { .. })));
     }
 
     #[test]
@@ -1733,5 +1908,493 @@ mod tests {
         };
         let _ = app.update(Message::Tick);
         assert!(matches!(app.screen, Some(Screen::Unlocked { .. })));
+    }
+
+    // ---------------------------------------------------------------------------------
+    // Navigation escape hatches (Detail / Edit / ChangeMasterPassword / Versions)
+    // ---------------------------------------------------------------------------------
+
+    /// The per-test temp vault, created on first use and reopened afterwards (each test
+    /// runs on its own thread, and the test data directory is thread-local).
+    fn test_vault() -> Vault {
+        sekrets_core::Vault::create(TEST_PASSWORD)
+            .or_else(|_| sekrets_core::Vault::unlock(TEST_PASSWORD))
+            .expect("vault should be available")
+    }
+
+    fn unlocked_with(view: UnlockedView) -> SekretsApp {
+        let vault = test_vault();
+        SekretsApp {
+            screen: Some(Screen::Unlocked {
+                vault,
+                view,
+                last_activity: Instant::now(),
+                clipboard_copied_at: None,
+            }),
+        }
+    }
+
+    fn assert_on_list(app: &SekretsApp) {
+        assert!(matches!(
+            app.screen,
+            Some(Screen::Unlocked {
+                view: UnlockedView::List { .. },
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn navigate_to_list_escapes_the_detail_view() {
+        let mut app = unlocked_with(UnlockedView::Detail {
+            key: ("github".to_string(), "alice".to_string()),
+            revealed: false,
+        });
+        let _ = app.update(Message::NavigateToList);
+        assert_on_list(&app);
+    }
+
+    #[test]
+    fn navigate_to_list_escapes_the_edit_view_without_saving() {
+        let mut app = unlocked_with(UnlockedView::Edit {
+            key: None,
+            account: "github".to_string(),
+            username: "alice".to_string(),
+            password: "hunter2".to_string(),
+            error: None,
+        });
+        let _ = app.update(Message::NavigateToList);
+        assert_on_list(&app);
+        match &app.screen {
+            Some(Screen::Unlocked { vault, .. }) => {
+                assert_eq!(vault.search("github").len(), 0, "cancel must not save");
+            }
+            _ => panic!("expected Unlocked screen"),
+        }
+    }
+
+    #[test]
+    fn navigate_to_list_escapes_change_master_password_without_changing_it() {
+        let mut app = unlocked_with(UnlockedView::ChangeMasterPassword {
+            new: "a-new-password".to_string(),
+            confirm: "a-new-password".to_string(),
+            error: None,
+        });
+        let _ = app.update(Message::NavigateToList);
+        assert_on_list(&app);
+        assert!(
+            sekrets_core::Vault::unlock(TEST_PASSWORD).is_ok(),
+            "cancelling must leave the master password untouched"
+        );
+    }
+
+    #[test]
+    fn navigate_to_list_escapes_the_versions_view_without_switching() {
+        let mut app = unlocked_with(UnlockedView::Versions {
+            versions: Vec::new(),
+            selected_version: None,
+            version_password: String::new(),
+            error: None,
+        });
+        let _ = app.update(Message::NavigateToList);
+        assert_on_list(&app);
+    }
+
+    #[test]
+    fn every_dead_end_view_renders_a_back_or_cancel_button() {
+        // The handler above is only reachable if the views actually offer the control;
+        // rendering each one proves the button-bearing arm is exercised.
+        for view in [
+            UnlockedView::Detail {
+                key: ("github".to_string(), "alice".to_string()),
+                revealed: false,
+            },
+            UnlockedView::Edit {
+                key: None,
+                account: String::new(),
+                username: String::new(),
+                password: String::new(),
+                error: None,
+            },
+            UnlockedView::ChangeMasterPassword {
+                new: String::new(),
+                confirm: String::new(),
+                error: None,
+            },
+            UnlockedView::Versions {
+                versions: Vec::new(),
+                selected_version: None,
+                version_password: String::new(),
+                error: None,
+            },
+        ] {
+            let app = unlocked_with(view);
+            let _ = app.view();
+        }
+    }
+
+    // ---------------------------------------------------------------------------------
+    // Clipboard auto-clear: never clobber a newer copy
+    // ---------------------------------------------------------------------------------
+
+    #[test]
+    fn copy_password_records_what_was_copied_for_the_later_read_back() {
+        let mut app = unlocked_with(UnlockedView::Detail {
+            key: ("github".to_string(), "alice".to_string()),
+            revealed: true,
+        });
+        let _ = app.update(Message::CopyPassword("s3cret".to_string()));
+        match &app.screen {
+            Some(Screen::Unlocked {
+                clipboard_copied_at: Some((_, copied)),
+                ..
+            }) => assert_eq!(copied, "s3cret"),
+            _ => panic!("expected the copied password to be recorded"),
+        }
+    }
+
+    #[test]
+    fn tick_after_the_delay_reads_the_clipboard_instead_of_wiping_it() {
+        let vault = sekrets_core::Vault::create(TEST_PASSWORD).expect("create should succeed");
+        let mut app = SekretsApp {
+            screen: Some(Screen::Unlocked {
+                vault,
+                view: UnlockedView::List {
+                    query: String::new(),
+                },
+                last_activity: Instant::now(),
+                clipboard_copied_at: Some((
+                    Instant::now() - std::time::Duration::from_secs(26),
+                    "s3cret".to_string(),
+                )),
+            }),
+        };
+
+        let action = first_action(app.update(Message::Tick)).expect("expected a clipboard action");
+
+        // A read, never an unconditional write: wiping here is what clobbered whatever the
+        // user copied after us.
+        assert!(
+            matches!(
+                action,
+                Action::Clipboard(iced_runtime::clipboard::Action::Read { .. })
+            ),
+            "expected a clipboard read-back, got a different action"
+        );
+
+        // The pending copy is consumed, so the read-back is issued exactly once.
+        match &app.screen {
+            Some(Screen::Unlocked {
+                clipboard_copied_at,
+                ..
+            }) => assert!(clipboard_copied_at.is_none()),
+            _ => panic!("expected Unlocked screen"),
+        }
+    }
+
+    #[test]
+    fn clipboard_is_wiped_when_it_still_holds_the_copied_password() {
+        let mut app = unlocked_with(UnlockedView::List {
+            query: String::new(),
+        });
+        let action = first_action(app.update(Message::ClipboardCheckedForClear {
+            expected: "s3cret".to_string(),
+            current: Some("s3cret".to_string()),
+        }))
+        .expect("expected a clipboard write");
+
+        match action {
+            Action::Clipboard(iced_runtime::clipboard::Action::Write { contents, .. }) => {
+                assert_eq!(contents, "");
+            }
+            _ => panic!("expected the clipboard to be wiped"),
+        }
+    }
+
+    #[test]
+    fn clipboard_is_left_alone_when_the_user_copied_something_else() {
+        let mut app = unlocked_with(UnlockedView::List {
+            query: String::new(),
+        });
+        let task = app.update(Message::ClipboardCheckedForClear {
+            expected: "s3cret".to_string(),
+            current: Some("a shopping list".to_string()),
+        });
+        assert!(
+            first_action(task).is_none(),
+            "must not touch a clipboard the user has since overwritten"
+        );
+    }
+
+    #[test]
+    fn clipboard_is_left_alone_when_it_is_empty() {
+        let mut app = unlocked_with(UnlockedView::List {
+            query: String::new(),
+        });
+        let task = app.update(Message::ClipboardCheckedForClear {
+            expected: "s3cret".to_string(),
+            current: None,
+        });
+        assert!(first_action(task).is_none());
+    }
+
+    #[test]
+    fn clipboard_check_does_not_count_as_activity_for_auto_lock() {
+        let vault = sekrets_core::Vault::create(TEST_PASSWORD).expect("create should succeed");
+        let idle_since = Instant::now() - std::time::Duration::from_secs(299);
+        let mut app = SekretsApp {
+            screen: Some(Screen::Unlocked {
+                vault,
+                view: UnlockedView::List {
+                    query: String::new(),
+                },
+                last_activity: idle_since,
+                clipboard_copied_at: None,
+            }),
+        };
+        let _ = app.update(Message::ClipboardCheckedForClear {
+            expected: "s3cret".to_string(),
+            current: None,
+        });
+        match &app.screen {
+            Some(Screen::Unlocked { last_activity, .. }) => {
+                assert_eq!(*last_activity, idle_since, "timer must not be reset");
+            }
+            _ => panic!("expected Unlocked screen"),
+        }
+    }
+
+    // ---------------------------------------------------------------------------------
+    // Versions view
+    // ---------------------------------------------------------------------------------
+
+    #[test]
+    fn versions_view_renders_the_modified_time_next_to_each_version() {
+        let mut vault = sekrets_core::Vault::create(TEST_PASSWORD).expect("create should succeed");
+        vault
+            .add("github", "alice", "hunter2")
+            .expect("add should succeed");
+        let path = sekrets_core::Vault::locate().expect("vault should exist");
+        sekrets_core::secrets::version_manager::snapshot_current(&path)
+            .expect("snapshot should succeed");
+
+        let versions = vault.list_versions().expect("list_versions should succeed");
+        assert_eq!(versions.len(), 1);
+        // Version numbers shift on rotation, so the timestamp is the only stable label.
+        let label = versions[0].format_modified_local();
+        assert!(!label.is_empty());
+        assert!(
+            label.contains('-'),
+            "expected a formatted date, got {label}"
+        );
+
+        let app = SekretsApp {
+            screen: Some(Screen::Unlocked {
+                vault,
+                view: UnlockedView::Versions {
+                    versions,
+                    selected_version: None,
+                    version_password: String::new(),
+                    error: None,
+                },
+                last_activity: Instant::now(),
+                clipboard_copied_at: None,
+            }),
+        };
+        let _ = app.view();
+    }
+
+    // ---------------------------------------------------------------------------------
+    // Real async round-trips: these drive the returned `iced::Task` to completion.
+    // ---------------------------------------------------------------------------------
+
+    #[test]
+    fn unlock_submitted_drives_the_task_to_a_real_unlock_completed_ok() {
+        sekrets_core::Vault::create(TEST_PASSWORD).expect("create should succeed");
+        let mut app = SekretsApp {
+            screen: Some(Screen::Locked {
+                path: sekrets_core::Vault::locate().expect("vault should exist"),
+                password: TEST_PASSWORD.to_string(),
+                error: None,
+                unlocking: false,
+            }),
+        };
+
+        let messages = drive_task(app.update(Message::UnlockSubmitted));
+
+        assert_eq!(
+            messages.len(),
+            1,
+            "the async leg must actually produce a message"
+        );
+        assert!(matches!(messages[0], Message::UnlockCompleted(Ok(_))));
+
+        // And feeding the produced message back must land the app in the unlocked state.
+        for message in messages {
+            let _ = app.update(message);
+        }
+        assert!(matches!(app.screen, Some(Screen::Unlocked { .. })));
+    }
+
+    #[test]
+    fn unlock_submitted_with_a_wrong_password_drives_to_a_real_error() {
+        sekrets_core::Vault::create(TEST_PASSWORD).expect("create should succeed");
+        let mut app = SekretsApp {
+            screen: Some(Screen::Locked {
+                path: sekrets_core::Vault::locate().expect("vault should exist"),
+                password: "definitely-not-it".to_string(),
+                error: None,
+                unlocking: false,
+            }),
+        };
+
+        let messages = drive_task(app.update(Message::UnlockSubmitted));
+
+        assert_eq!(messages.len(), 1);
+        assert!(matches!(
+            messages[0],
+            Message::UnlockCompleted(Err(sekrets_core::VaultError::WrongPassword))
+        ));
+    }
+
+    #[test]
+    fn create_submitted_drives_the_task_to_a_real_create_completed() {
+        let mut app = SekretsApp {
+            screen: Some(Screen::NoVaultFound {
+                path: std::path::PathBuf::from("/tmp/sekrets.enc"),
+                password: TEST_PASSWORD.to_string(),
+                confirm: TEST_PASSWORD.to_string(),
+                error: None,
+                creating: false,
+            }),
+        };
+
+        let messages = drive_task(app.update(Message::CreateSubmitted));
+
+        assert_eq!(messages.len(), 1);
+        assert!(matches!(messages[0], Message::CreateCompleted(Ok(_))));
+
+        for message in messages {
+            let _ = app.update(message);
+        }
+        assert!(matches!(app.screen, Some(Screen::Unlocked { .. })));
+    }
+
+    #[test]
+    fn migrate_accepted_drives_the_task_to_a_real_migrate_completed() {
+        sekrets_core::encryption::encryptor::encrypt_text(
+            "github - username: foo, password: bar",
+            TEST_PASSWORD,
+        )
+        .expect("encrypt_text should succeed");
+        let vault = sekrets_core::Vault::unlock(TEST_PASSWORD).expect("unlock should succeed");
+        assert!(vault.needs_migration());
+
+        let mut app = SekretsApp {
+            screen: Some(Screen::MigrationPrompt {
+                vault,
+                last_activity: Instant::now(),
+            }),
+        };
+
+        let messages = drive_task(app.update(Message::MigrateAccepted));
+
+        assert_eq!(messages.len(), 1);
+        assert!(matches!(messages[0], Message::MigrateCompleted(_, Ok(()))));
+
+        for message in messages {
+            let _ = app.update(message);
+        }
+        match &app.screen {
+            Some(Screen::Unlocked { vault, .. }) => assert!(!vault.needs_migration()),
+            _ => panic!("expected Unlocked screen after a completed migration"),
+        }
+    }
+
+    #[test]
+    fn switch_version_requested_drives_the_task_to_a_real_switch_version_completed() {
+        let mut vault = sekrets_core::Vault::create(TEST_PASSWORD).expect("create should succeed");
+        vault
+            .add("old-account", "alice", "hunter2")
+            .expect("add should succeed");
+        let path = sekrets_core::Vault::locate().expect("vault should exist");
+        sekrets_core::secrets::version_manager::snapshot_current(&path)
+            .expect("snapshot should succeed");
+        vault
+            .delete("old-account", "alice")
+            .expect("delete should succeed");
+
+        let versions = vault.list_versions().expect("list_versions should succeed");
+        let mut app = SekretsApp {
+            screen: Some(Screen::Unlocked {
+                vault,
+                view: UnlockedView::Versions {
+                    versions,
+                    selected_version: None,
+                    version_password: TEST_PASSWORD.to_string(),
+                    error: None,
+                },
+                last_activity: Instant::now(),
+                clipboard_copied_at: None,
+            }),
+        };
+
+        let messages = drive_task(app.update(Message::SwitchVersionRequested(1)));
+
+        assert_eq!(messages.len(), 1);
+        assert!(matches!(
+            messages[0],
+            Message::SwitchVersionCompleted(Ok(()))
+        ));
+
+        for message in messages {
+            let _ = app.update(message);
+        }
+        match &app.screen {
+            Some(Screen::Unlocked {
+                view: UnlockedView::List { .. },
+                vault,
+                ..
+            }) => assert_eq!(vault.search("old-account").len(), 1),
+            _ => panic!("expected List view with the restored credential"),
+        }
+    }
+
+    #[test]
+    fn the_configured_iced_executor_actually_runs_spawned_futures() {
+        // Direct regression test for the H1 bug: without `iced`'s "tokio" feature,
+        // `iced_futures` silently selects its "null" backend, whose `spawn` is a no-op —
+        // so every `Task::perform` future was dropped and no async work in the app ever
+        // completed. `drive_task` above polls streams itself and cannot see this; only
+        // asking the executor the app is actually built with to run something can.
+        use iced::executor::{Default as DefaultExecutor, Executor};
+
+        // Explicit trait dispatch: the default backend is a bare `tokio::runtime::Runtime`
+        // with inherent `new`/`spawn` of its own, and the null backend's *trait* `spawn` is
+        // the no-op that caused the bug, so the test has to go through the trait.
+        let executor = <DefaultExecutor as Executor>::new()
+            .expect("the default executor must be constructible");
+        let (sender, receiver) = std::sync::mpsc::channel();
+        Executor::spawn(&executor, async move {
+            let _ = sender.send(42);
+        });
+
+        assert_eq!(
+            receiver
+                .recv_timeout(std::time::Duration::from_secs(10))
+                .expect("the executor must actually run spawned futures"),
+            42
+        );
+    }
+
+    #[test]
+    fn located_task_from_startup_drives_to_a_real_located_message() {
+        sekrets_core::Vault::create(TEST_PASSWORD).expect("create should succeed");
+        let task = Task::perform(async { sekrets_core::Vault::locate() }, Message::Located);
+
+        let messages = drive_task(task);
+
+        assert_eq!(messages.len(), 1);
+        assert!(matches!(messages[0], Message::Located(Some(_))));
     }
 }

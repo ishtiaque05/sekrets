@@ -22,6 +22,13 @@ sekrets-core = { path = "../sekrets-core" }
 
 [dev-dependencies]
 sekrets-core = { path = "../sekrets-core", features = ["test-utils"] }
+# `iced_runtime::task::into_stream` is the only way to get at a `Task`'s underlying
+# stream; it is public in `iced_runtime` but not re-exported through `iced`. Together with
+# `futures`'s blocking executor it lets tests drive a real `Task` to completion and assert
+# on the messages/actions it produces — the coverage gap that let the null-executor bug
+# (every `Task::perform` future silently dropped) hide for five phases.
+iced_runtime = "0.13.2"
+futures = "0.3"
 
 [package.metadata.deb]
 maintainer = "Syed Ishtiaque Ahmad <ishtiaque05@gmail.com>"

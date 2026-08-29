@@ -21,8 +21,12 @@ impl SekretsApp {
     }
 
     fn subscription(&self) -> iced::Subscription<screen::Message> {
+        // Every screen that holds — or has in flight — a decrypted vault must tick, or it
+        // never auto-locks. `MigrationPrompt` is one a user can sit on indefinitely.
         match &self.screen {
-            Some(screen::Screen::Unlocked { .. }) => {
+            Some(screen::Screen::Unlocked { .. })
+            | Some(screen::Screen::MigrationPrompt { .. })
+            | Some(screen::Screen::Migrating { .. }) => {
                 iced::time::every(std::time::Duration::from_secs(5)).map(|_| screen::Message::Tick)
             }
             _ => iced::Subscription::none(),
