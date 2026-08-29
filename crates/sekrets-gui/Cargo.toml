@@ -22,3 +22,12 @@ sekrets-core = { path = "../sekrets-core" }
 
 [dev-dependencies]
 sekrets-core = { path = "../sekrets-core", features = ["test-utils"] }
+
+[package.metadata.bundle]
+name = "Sekrets"
+identifier = "com.ishtiaque05.sekrets-gui"
+icon = []
+version = "0.1.0"
+copyright = "Copyright (c) Syed Ishtiaque Ahmad"
+category = "public.app-category.utilities"
+short_description = "Desktop GUI for the sekrets secret manager"
