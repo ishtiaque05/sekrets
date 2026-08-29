@@ -85,6 +85,7 @@ pub enum Message {
     EditAccountChanged(String),
     EditUsernameChanged(String),
     EditPasswordChanged(String),
+    GeneratePassword,
     EditSubmitted,
     DeleteRequested(String, String),
     DeleteConfirmed,
@@ -414,6 +415,18 @@ impl SekretsApp {
                 }
                 Task::none()
             }
+            Message::GeneratePassword => {
+                if let Some(Screen::Unlocked {
+                    view: UnlockedView::Edit { password, .. },
+                    ..
+                }) = &mut self.screen
+                {
+                    *password =
+                        sekrets_core::secrets::password_generator::PasswordGenerator::new(None)
+                            .generate_random();
+                }
+                Task::none()
+            }
             Message::EditSubmitted => {
                 if let Some(Screen::Unlocked {
                     vault,
@@ -637,6 +650,15 @@ impl SekretsApp {
                     },
                 ..
             }) => {
+                let strength = if password.is_empty() {
+                    ""
+                } else if sekrets_core::secrets::password_generator::is_password_strong(password)
+                {
+                    "Strong"
+                } else {
+                    "Weak — consider a longer or more complex password"
+                };
+
                 let mut col = column![
                     text(if key.is_some() {
                         "Edit credential"
@@ -648,6 +670,8 @@ impl SekretsApp {
                     text_input("Password", password)
                         .on_input(Message::EditPasswordChanged)
                         .secure(true),
+                    button("Generate password").on_press(Message::GeneratePassword),
+                    text(strength),
                     button("Save").on_press(Message::EditSubmitted),
                 ]
                 .spacing(10);
@@ -1261,5 +1285,34 @@ mod tests {
             }),
         };
         let _ = app.view(); // must not panic
+    }
+
+    #[test]
+    fn generate_password_fills_password_field() {
+        let vault = sekrets_core::Vault::create(TEST_PASSWORD).expect("create should succeed");
+        let mut app = SekretsApp {
+            screen: Some(Screen::Unlocked {
+                vault,
+                view: UnlockedView::Edit {
+                    key: None,
+                    account: "github".to_string(),
+                    username: "alice".to_string(),
+                    password: String::new(),
+                    error: None,
+                },
+                last_activity: Instant::now(),
+                clipboard_copied_at: None,
+            }),
+        };
+        let _ = app.update(Message::GeneratePassword);
+        match &app.screen {
+            Some(Screen::Unlocked {
+                view: UnlockedView::Edit { password, .. },
+                ..
+            }) => {
+                assert_eq!(password.len(), 16);
+            }
+            _ => panic!("expected Edit view"),
+        }
     }
 }
