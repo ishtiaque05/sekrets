@@ -48,6 +48,15 @@ pub enum UnlockedView {
         key: (String, String),
         revealed: bool,
     },
+    // `key: None` means adding a new credential; `key: Some((account, username))`
+    // means editing that existing credential.
+    Edit {
+        key: Option<(String, String)>,
+        account: String,
+        username: String,
+        password: String,
+        error: Option<VaultError>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -67,6 +76,12 @@ pub enum Message {
     CredentialSelected(String, String),
     RevealToggled,
     CopyPassword(String),
+    NavigateToAdd,
+    NavigateToEdit(String, String),
+    EditAccountChanged(String),
+    EditUsernameChanged(String),
+    EditPasswordChanged(String),
+    EditSubmitted,
 }
 
 /// Returns true once `delay` has elapsed since `copied_at`, as measured against `now`.
@@ -318,6 +333,122 @@ impl SekretsApp {
                 }
                 iced::clipboard::write(password)
             }
+            Message::NavigateToAdd => {
+                if let Some(Screen::Unlocked {
+                    view,
+                    last_activity,
+                    ..
+                }) = &mut self.screen
+                {
+                    *view = UnlockedView::Edit {
+                        key: None,
+                        account: String::new(),
+                        username: String::new(),
+                        password: String::new(),
+                        error: None,
+                    };
+                    *last_activity = Instant::now();
+                }
+                Task::none()
+            }
+            Message::NavigateToEdit(account, username) => {
+                if let Some(Screen::Unlocked {
+                    vault,
+                    view,
+                    last_activity,
+                    ..
+                }) = &mut self.screen
+                {
+                    let existing_password = vault
+                        .search(&account)
+                        .iter()
+                        .find(|c| c.username == username)
+                        .map(|c| c.password.clone());
+                    if let Some(password) = existing_password {
+                        *view = UnlockedView::Edit {
+                            key: Some((account.clone(), username.clone())),
+                            account: account.clone(),
+                            username: username.clone(),
+                            password,
+                            error: None,
+                        };
+                    }
+                    *last_activity = Instant::now();
+                }
+                Task::none()
+            }
+            Message::EditAccountChanged(v) => {
+                if let Some(Screen::Unlocked {
+                    view: UnlockedView::Edit { account, .. },
+                    ..
+                }) = &mut self.screen
+                {
+                    *account = v;
+                }
+                Task::none()
+            }
+            Message::EditUsernameChanged(v) => {
+                if let Some(Screen::Unlocked {
+                    view: UnlockedView::Edit { username, .. },
+                    ..
+                }) = &mut self.screen
+                {
+                    *username = v;
+                }
+                Task::none()
+            }
+            Message::EditPasswordChanged(v) => {
+                if let Some(Screen::Unlocked {
+                    view: UnlockedView::Edit { password, .. },
+                    ..
+                }) = &mut self.screen
+                {
+                    *password = v;
+                }
+                Task::none()
+            }
+            Message::EditSubmitted => {
+                if let Some(Screen::Unlocked {
+                    vault,
+                    view:
+                        UnlockedView::Edit {
+                            key,
+                            account,
+                            username,
+                            password,
+                            error,
+                        },
+                    ..
+                }) = &mut self.screen
+                {
+                    let result = match key {
+                        None => vault.add(account, username, password),
+                        Some((old_account, old_username)) => {
+                            if old_account == account && old_username == username {
+                                vault.update(account, username, password)
+                            } else {
+                                // Renaming account/username: delete the old key, add the new one.
+                                vault
+                                    .delete(old_account, old_username)
+                                    .and_then(|_| vault.add(account, username, password))
+                            }
+                        }
+                    };
+                    match result {
+                        Ok(()) => {
+                            if let Some(Screen::Unlocked { view, .. }) = &mut self.screen {
+                                *view = UnlockedView::List {
+                                    query: String::new(),
+                                };
+                            }
+                        }
+                        Err(e) => {
+                            *error = Some(e);
+                        }
+                    }
+                }
+                Task::none()
+            }
         }
     }
 
@@ -383,6 +514,7 @@ impl SekretsApp {
                 let mut list = column![
                     text_input("Search accounts or usernames", query)
                         .on_input(Message::SearchChanged),
+                    button("Add credential").on_press(Message::NavigateToAdd),
                 ]
                 .spacing(10);
                 for cred in results {
@@ -415,6 +547,10 @@ impl SekretsApp {
                                 .on_press(Message::RevealToggled),
                             button("Copy password")
                                 .on_press(Message::CopyPassword(cred.password.clone())),
+                            button("Edit").on_press(Message::NavigateToEdit(
+                                cred.account.clone(),
+                                cred.username.clone()
+                            )),
                             text("Password history:"),
                         ]
                         .spacing(10);
@@ -433,6 +569,36 @@ impl SekretsApp {
                     }
                     None => text("Credential not found").into(),
                 }
+            }
+            Some(Screen::Unlocked {
+                view:
+                    UnlockedView::Edit {
+                        key,
+                        account,
+                        username,
+                        password,
+                        error,
+                    },
+                ..
+            }) => {
+                let mut col = column![
+                    text(if key.is_some() {
+                        "Edit credential"
+                    } else {
+                        "Add credential"
+                    }),
+                    text_input("Account", account).on_input(Message::EditAccountChanged),
+                    text_input("Username", username).on_input(Message::EditUsernameChanged),
+                    text_input("Password", password)
+                        .on_input(Message::EditPasswordChanged)
+                        .secure(true),
+                    button("Save").on_press(Message::EditSubmitted),
+                ]
+                .spacing(10);
+                if let Some(err) = error {
+                    col = col.push(text(err.to_string()));
+                }
+                col.into()
             }
             Some(Screen::MigrationPrompt { .. }) => column![
                 text("Your sekrets file uses an older format."),
@@ -702,6 +868,113 @@ mod tests {
             Instant::now(),
             std::time::Duration::from_secs(30)
         ));
+    }
+
+    #[test]
+    fn edit_submitted_add_success_returns_to_list() {
+        let vault = sekrets_core::Vault::create(TEST_PASSWORD).expect("create should succeed");
+        let mut app = SekretsApp {
+            screen: Some(Screen::Unlocked {
+                vault,
+                view: UnlockedView::Edit {
+                    key: None,
+                    account: "github".to_string(),
+                    username: "alice".to_string(),
+                    password: "hunter2".to_string(),
+                    error: None,
+                },
+                last_activity: Instant::now(),
+                clipboard_copied_at: None,
+            }),
+        };
+        let _ = app.update(Message::EditSubmitted);
+        match &app.screen {
+            Some(Screen::Unlocked {
+                view: UnlockedView::List { .. },
+                vault,
+                ..
+            }) => {
+                assert_eq!(vault.search("github").len(), 1);
+            }
+            _ => panic!("expected List view after successful add"),
+        }
+    }
+
+    #[test]
+    fn edit_submitted_duplicate_add_shows_inline_error_and_keeps_input() {
+        let mut vault = sekrets_core::Vault::create(TEST_PASSWORD).expect("create should succeed");
+        vault
+            .add("github", "alice", "existing")
+            .expect("add should succeed");
+
+        let mut app = SekretsApp {
+            screen: Some(Screen::Unlocked {
+                vault,
+                view: UnlockedView::Edit {
+                    key: None,
+                    account: "github".to_string(),
+                    username: "alice".to_string(),
+                    password: "hunter2".to_string(),
+                    error: None,
+                },
+                last_activity: Instant::now(),
+                clipboard_copied_at: None,
+            }),
+        };
+        let _ = app.update(Message::EditSubmitted);
+        match &app.screen {
+            Some(Screen::Unlocked {
+                view: UnlockedView::Edit { error, account, .. },
+                ..
+            }) => {
+                assert!(error.is_some());
+                assert_eq!(account, "github"); // input preserved, not discarded
+            }
+            _ => panic!("expected to stay on Edit view with an error"),
+        }
+    }
+
+    #[test]
+    fn navigate_to_edit_prefills_existing_password_and_key() {
+        let mut vault = sekrets_core::Vault::create(TEST_PASSWORD).expect("create should succeed");
+        vault
+            .add("github", "alice", "secret123")
+            .expect("add should succeed");
+
+        let mut app = SekretsApp {
+            screen: Some(Screen::Unlocked {
+                vault,
+                view: UnlockedView::List {
+                    query: String::new(),
+                },
+                last_activity: Instant::now(),
+                clipboard_copied_at: None,
+            }),
+        };
+        let _ = app.update(Message::NavigateToEdit(
+            "github".to_string(),
+            "alice".to_string(),
+        ));
+        match &app.screen {
+            Some(Screen::Unlocked {
+                view:
+                    UnlockedView::Edit {
+                        key,
+                        account,
+                        username,
+                        password,
+                        error,
+                    },
+                ..
+            }) => {
+                assert_eq!(key, &Some(("github".to_string(), "alice".to_string())));
+                assert_eq!(account, "github");
+                assert_eq!(username, "alice");
+                assert_eq!(password, "secret123");
+                assert!(error.is_none());
+            }
+            _ => panic!("expected Edit view prefilled with existing credential"),
+        }
     }
 
     #[test]
