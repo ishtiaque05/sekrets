@@ -67,6 +67,24 @@ chmod +x target/appimage/sekrets-gui-*.AppImage
 ./target/appimage/sekrets-gui-*.AppImage
 ```
 
+### Uninstall
+
+**Linux (`.deb`):**
+
+```sh
+sudo apt purge sekrets-gui
+```
+
+This only removes the `sekrets-gui` package — it does **not** delete your
+`sekrets.enc` vault file, since the GUI's data-cleanup is deliberately left
+to the `sekrets` (CLI) package's own uninstall, so a GUI-only purge can't
+accidentally delete data you're still using from the CLI.
+
+**macOS:** drag `Sekrets.app` from `/Applications` to the Trash — there's no
+package manager involved.
+
+**AppImage:** delete the `sekrets-gui-*.AppImage` file.
+
 ### Run from source
 
 If you have the repo checked out and Rust installed, you don't need to
