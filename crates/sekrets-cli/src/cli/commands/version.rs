@@ -30,12 +30,7 @@ fn list_versions() -> Result<()> {
 
     println!("Versions:");
     for v in &versions {
-        let time_str = {
-            use chrono::{DateTime, Local};
-            let datetime: DateTime<Local> = v.modified.into();
-            datetime.format("%Y-%m-%d %I:%M %p %Z").to_string()
-        };
-        println!("  v{}  {}", v.number, time_str);
+        println!("  v{}  {}", v.number, v.format_modified_local());
     }
 
     Ok(())

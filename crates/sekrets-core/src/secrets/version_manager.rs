@@ -11,6 +11,20 @@ pub struct VersionInfo {
     pub modified: std::time::SystemTime,
 }
 
+impl VersionInfo {
+    /// The snapshot's modified time in the viewer's local timezone.
+    ///
+    /// Version *numbers* shift on every snapshot rotation, so the timestamp is the only
+    /// stable way for a user to tell which restore point they are about to switch to.
+    /// Shared by the CLI's `version --list` and the GUI's Versions screen so both label
+    /// the same snapshot identically.
+    pub fn format_modified_local(&self) -> String {
+        use chrono::{DateTime, Local};
+        let datetime: DateTime<Local> = self.modified.into();
+        datetime.format("%Y-%m-%d %I:%M %p %Z").to_string()
+    }
+}
+
 /// Get the path to a specific version file.
 pub fn get_version_file_path(n: usize) -> PathBuf {
     get_versions_path().join(format!("sekrets.v{}.enc", n))
