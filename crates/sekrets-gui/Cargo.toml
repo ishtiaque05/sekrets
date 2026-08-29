@@ -11,7 +11,13 @@ name = "sekrets-gui"
 path = "src/main.rs"
 
 [dependencies]
-iced = "0.13.1"
+# "tokio" enables iced_futures's native async executor backend. Without it, iced_futures
+# falls back to its "null" backend (see iced_futures::backend::null), which (a) has no
+# `time::every` function at all — `iced::time::every`, which this task's subscription
+# needs, would fail to compile — and (b) silently drops every `Task`/async future instead
+# of spawning it, so no `Task::perform`-driven async work (unlock, create, migrate, etc.)
+# would ever complete. Discovered while implementing Task H1; not present before.
+iced = { version = "0.13.1", features = ["tokio"] }
 sekrets-core = { path = "../sekrets-core" }
 
 [dev-dependencies]

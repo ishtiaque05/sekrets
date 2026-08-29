@@ -19,9 +19,19 @@ impl SekretsApp {
     fn title(&self) -> String {
         "Sekrets".to_string()
     }
+
+    fn subscription(&self) -> iced::Subscription<screen::Message> {
+        match &self.screen {
+            Some(screen::Screen::Unlocked { .. }) => {
+                iced::time::every(std::time::Duration::from_secs(5)).map(|_| screen::Message::Tick)
+            }
+            _ => iced::Subscription::none(),
+        }
+    }
 }
 
 fn main() -> iced::Result {
     iced::application(SekretsApp::title, SekretsApp::update, SekretsApp::view)
+        .subscription(SekretsApp::subscription)
         .run_with(SekretsApp::new)
 }

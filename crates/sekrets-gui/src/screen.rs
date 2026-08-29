@@ -109,19 +109,35 @@ pub enum Message {
     SwitchVersionPasswordChanged(String),
     SwitchVersionRequested(usize),
     SwitchVersionCompleted(Result<(), VaultError>),
+    Tick,
 }
 
 /// Returns true once `delay` has elapsed since `copied_at`, as measured against `now`.
 /// Pure helper so it can be unit-tested without driving the app's async runtime; the
 /// actual clearing (calling `iced::clipboard::write(String::new())`) is wired into
 /// Task H1's `Message::Tick` handler, which will call this alongside the auto-lock check.
-#[allow(dead_code)]
 pub fn should_clear_clipboard(
     copied_at: Instant,
     now: Instant,
     delay: std::time::Duration,
 ) -> bool {
     now.duration_since(copied_at) >= delay
+}
+
+/// How long the app may sit idle (no `Message` other than `Tick` observed) before
+/// `Message::Tick` locks the vault, per `should_lock`.
+pub const AUTO_LOCK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(300);
+
+/// How long a copied password stays on the clipboard before `Message::Tick` clears it,
+/// per `should_clear_clipboard`.
+pub const CLIPBOARD_CLEAR_DELAY: std::time::Duration = std::time::Duration::from_secs(25);
+
+/// Returns true once `timeout` has elapsed since `last_activity`, as measured against
+/// `now`. Pure helper so it can be unit-tested without driving the app's async runtime;
+/// the actual locking (reassigning `self.screen` to `Screen::Locked`, which drops the
+/// `Vault` via ownership) is wired into `Message::Tick`'s handler.
+pub fn should_lock(last_activity: Instant, now: Instant, timeout: std::time::Duration) -> bool {
+    now.duration_since(last_activity) >= timeout
 }
 
 fn enter_unlocked_or_migration(vault: Vault) -> Screen {
@@ -152,6 +168,11 @@ pub struct SekretsApp {
 
 impl SekretsApp {
     pub fn update(&mut self, message: Message) -> Task<Message> {
+        if !matches!(message, Message::Tick) {
+            if let Some(Screen::Unlocked { last_activity, .. }) = &mut self.screen {
+                *last_activity = Instant::now();
+            }
+        }
         match message {
             Message::Located(Some(path)) => {
                 self.screen = Some(Screen::Locked {
@@ -653,6 +674,39 @@ impl SekretsApp {
                 }) = &mut self.screen
                 {
                     *error = Some(err);
+                }
+                Task::none()
+            }
+            Message::Tick => {
+                if let Some(Screen::Unlocked {
+                    last_activity,
+                    clipboard_copied_at,
+                    ..
+                }) = &self.screen
+                {
+                    if should_lock(*last_activity, Instant::now(), AUTO_LOCK_TIMEOUT) {
+                        let path = Vault::locate().unwrap_or_default();
+                        self.screen = Some(Screen::Locked {
+                            path,
+                            password: String::new(),
+                            error: None,
+                            unlocking: false,
+                        });
+                        return Task::none();
+                    }
+                    if let Some(copied_at) = clipboard_copied_at {
+                        if should_clear_clipboard(*copied_at, Instant::now(), CLIPBOARD_CLEAR_DELAY)
+                        {
+                            if let Some(Screen::Unlocked {
+                                clipboard_copied_at,
+                                ..
+                            }) = &mut self.screen
+                            {
+                                *clipboard_copied_at = None;
+                            }
+                            return iced::clipboard::write(String::new());
+                        }
+                    }
                 }
                 Task::none()
             }
@@ -1619,5 +1673,65 @@ mod tests {
                 ..
             })
         ));
+    }
+
+    #[test]
+    fn should_lock_true_after_timeout_elapsed() {
+        let last_activity = Instant::now() - std::time::Duration::from_secs(301);
+        assert!(should_lock(
+            last_activity,
+            Instant::now(),
+            std::time::Duration::from_secs(300)
+        ));
+    }
+
+    #[test]
+    fn should_lock_false_before_timeout_elapsed() {
+        let last_activity = Instant::now();
+        assert!(!should_lock(
+            last_activity,
+            Instant::now(),
+            std::time::Duration::from_secs(300)
+        ));
+    }
+
+    #[test]
+    fn tick_locks_and_drops_vault_when_idle_timeout_elapsed() {
+        let vault = sekrets_core::Vault::create(TEST_PASSWORD).expect("create should succeed");
+        let path = sekrets_core::Vault::locate().expect("vault should exist");
+        let mut app = SekretsApp {
+            screen: Some(Screen::Unlocked {
+                vault,
+                view: UnlockedView::List {
+                    query: String::new(),
+                },
+                last_activity: Instant::now() - std::time::Duration::from_secs(301),
+                clipboard_copied_at: None,
+            }),
+        };
+        let _ = app.update(Message::Tick);
+        match &app.screen {
+            Some(Screen::Locked {
+                path: locked_path, ..
+            }) => assert_eq!(locked_path, &path),
+            _ => panic!("expected Locked screen after idle timeout"),
+        }
+    }
+
+    #[test]
+    fn tick_does_not_lock_when_recently_active() {
+        let vault = sekrets_core::Vault::create(TEST_PASSWORD).expect("create should succeed");
+        let mut app = SekretsApp {
+            screen: Some(Screen::Unlocked {
+                vault,
+                view: UnlockedView::List {
+                    query: String::new(),
+                },
+                last_activity: Instant::now(),
+                clipboard_copied_at: None,
+            }),
+        };
+        let _ = app.update(Message::Tick);
+        assert!(matches!(app.screen, Some(Screen::Unlocked { .. })));
     }
 }
