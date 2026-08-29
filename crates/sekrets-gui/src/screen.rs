@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 use std::time::Instant;
 
-use iced::widget::{button, column, text, text_input};
+use iced::widget::{button, column, row, text, text_input};
 use iced::{Element, Task};
-use sekrets_core::{Vault, VaultError};
+use sekrets_core::{Vault, VaultError, VersionInfo};
 
 pub enum Screen {
     Locating,
@@ -66,6 +66,12 @@ pub enum UnlockedView {
         confirm: String,
         error: Option<VaultError>,
     },
+    Versions {
+        versions: Vec<VersionInfo>,
+        selected_version: Option<usize>,
+        version_password: String,
+        error: Option<VaultError>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -99,6 +105,10 @@ pub enum Message {
     ChangeMpNewChanged(String),
     ChangeMpConfirmChanged(String),
     ChangeMpSubmitted,
+    NavigateToVersions,
+    SwitchVersionPasswordChanged(String),
+    SwitchVersionRequested(usize),
+    SwitchVersionCompleted(Result<(), VaultError>),
 }
 
 /// Returns true once `delay` has elapsed since `copied_at`, as measured against `now`.
@@ -582,6 +592,70 @@ impl SekretsApp {
                 }
                 Task::none()
             }
+            Message::NavigateToVersions => {
+                if let Some(Screen::Unlocked { vault, view, .. }) = &mut self.screen {
+                    let (versions, error) = match vault.list_versions() {
+                        Ok(v) => (v, None),
+                        Err(e) => (Vec::new(), Some(e)),
+                    };
+                    *view = UnlockedView::Versions {
+                        versions,
+                        selected_version: None,
+                        version_password: String::new(),
+                        error,
+                    };
+                }
+                Task::none()
+            }
+            Message::SwitchVersionPasswordChanged(v) => {
+                if let Some(Screen::Unlocked {
+                    view:
+                        UnlockedView::Versions {
+                            version_password, ..
+                        },
+                    ..
+                }) = &mut self.screen
+                {
+                    *version_password = v;
+                }
+                Task::none()
+            }
+            Message::SwitchVersionRequested(n) => {
+                if let Some(Screen::Unlocked {
+                    vault,
+                    view:
+                        UnlockedView::Versions {
+                            selected_version,
+                            version_password,
+                            ..
+                        },
+                    ..
+                }) = &mut self.screen
+                {
+                    *selected_version = Some(n);
+                    let result = vault.switch_version(n, version_password);
+                    return Task::perform(async move { result }, Message::SwitchVersionCompleted);
+                }
+                Task::none()
+            }
+            Message::SwitchVersionCompleted(Ok(())) => {
+                if let Some(Screen::Unlocked { view, .. }) = &mut self.screen {
+                    *view = UnlockedView::List {
+                        query: String::new(),
+                    };
+                }
+                Task::none()
+            }
+            Message::SwitchVersionCompleted(Err(err)) => {
+                if let Some(Screen::Unlocked {
+                    view: UnlockedView::Versions { error, .. },
+                    ..
+                }) = &mut self.screen
+                {
+                    *error = Some(err);
+                }
+                Task::none()
+            }
         }
     }
 
@@ -650,6 +724,7 @@ impl SekretsApp {
                     button("Add credential").on_press(Message::NavigateToAdd),
                     button("Change master password")
                         .on_press(Message::NavigateToChangeMasterPassword),
+                    button("Versions").on_press(Message::NavigateToVersions),
                 ]
                 .spacing(10);
                 for cred in results {
@@ -788,6 +863,37 @@ impl SekretsApp {
                     button("Change password").on_press(Message::ChangeMpSubmitted),
                 ]
                 .spacing(10);
+                if let Some(err) = error {
+                    col = col.push(text(err.to_string()));
+                }
+                col.into()
+            }
+            Some(Screen::Unlocked {
+                view:
+                    UnlockedView::Versions {
+                        versions,
+                        version_password,
+                        error,
+                        ..
+                    },
+                ..
+            }) => {
+                let mut col = column![text("Versions")].spacing(10);
+                for v in versions {
+                    col = col.push(
+                        row![
+                            text(format!("v{}", v.number)),
+                            button("Switch to this version")
+                                .on_press(Message::SwitchVersionRequested(v.number)),
+                        ]
+                        .spacing(10),
+                    );
+                }
+                col = col.push(
+                    text_input("Password for the selected version", version_password)
+                        .on_input(Message::SwitchVersionPasswordChanged)
+                        .secure(true),
+                );
                 if let Some(err) = error {
                     col = col.push(text(err.to_string()));
                 }
@@ -1464,5 +1570,54 @@ mod tests {
             }
             _ => panic!("expected Edit view"),
         }
+    }
+
+    #[test]
+    fn navigate_to_versions_loads_version_list() {
+        let vault = sekrets_core::Vault::create(TEST_PASSWORD).expect("create should succeed");
+        let mut app = SekretsApp {
+            screen: Some(Screen::Unlocked {
+                vault,
+                view: UnlockedView::List {
+                    query: String::new(),
+                },
+                last_activity: Instant::now(),
+                clipboard_copied_at: None,
+            }),
+        };
+        let _ = app.update(Message::NavigateToVersions);
+        assert!(matches!(
+            app.screen,
+            Some(Screen::Unlocked {
+                view: UnlockedView::Versions { .. },
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn switch_version_completed_success_returns_to_list() {
+        let vault = sekrets_core::Vault::create(TEST_PASSWORD).expect("create should succeed");
+        let mut app = SekretsApp {
+            screen: Some(Screen::Unlocked {
+                vault,
+                view: UnlockedView::Versions {
+                    versions: Vec::new(),
+                    selected_version: Some(1),
+                    version_password: TEST_PASSWORD.to_string(),
+                    error: None,
+                },
+                last_activity: Instant::now(),
+                clipboard_copied_at: None,
+            }),
+        };
+        let _ = app.update(Message::SwitchVersionCompleted(Ok(())));
+        assert!(matches!(
+            app.screen,
+            Some(Screen::Unlocked {
+                view: UnlockedView::List { .. },
+                ..
+            })
+        ));
     }
 }
