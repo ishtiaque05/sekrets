@@ -57,6 +57,10 @@ pub enum UnlockedView {
         password: String,
         error: Option<VaultError>,
     },
+    DeleteConfirm {
+        key: (String, String),
+        error: Option<VaultError>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -82,6 +86,9 @@ pub enum Message {
     EditUsernameChanged(String),
     EditPasswordChanged(String),
     EditSubmitted,
+    DeleteRequested(String, String),
+    DeleteConfirmed,
+    DeleteCancelled,
 }
 
 /// Returns true once `delay` has elapsed since `copied_at`, as measured against `now`.
@@ -455,6 +462,45 @@ impl SekretsApp {
                 }
                 Task::none()
             }
+            Message::DeleteRequested(account, username) => {
+                if let Some(Screen::Unlocked { view, .. }) = &mut self.screen {
+                    *view = UnlockedView::DeleteConfirm {
+                        key: (account, username),
+                        error: None,
+                    };
+                }
+                Task::none()
+            }
+            Message::DeleteConfirmed => {
+                if let Some(Screen::Unlocked {
+                    vault,
+                    view: UnlockedView::DeleteConfirm { key, error },
+                    ..
+                }) = &mut self.screen
+                {
+                    match vault.delete(&key.0, &key.1) {
+                        Ok(()) => {
+                            if let Some(Screen::Unlocked { view, .. }) = &mut self.screen {
+                                *view = UnlockedView::List {
+                                    query: String::new(),
+                                };
+                            }
+                        }
+                        Err(e) => {
+                            *error = Some(e);
+                        }
+                    }
+                }
+                Task::none()
+            }
+            Message::DeleteCancelled => {
+                if let Some(Screen::Unlocked { view, .. }) = &mut self.screen {
+                    *view = UnlockedView::List {
+                        query: String::new(),
+                    };
+                }
+                Task::none()
+            }
         }
     }
 
@@ -557,6 +603,10 @@ impl SekretsApp {
                                 cred.account.clone(),
                                 cred.username.clone()
                             )),
+                            button("Delete").on_press(Message::DeleteRequested(
+                                cred.account.clone(),
+                                cred.username.clone()
+                            )),
                             text("Password history:"),
                         ]
                         .spacing(10);
@@ -599,6 +649,24 @@ impl SekretsApp {
                         .on_input(Message::EditPasswordChanged)
                         .secure(true),
                     button("Save").on_press(Message::EditSubmitted),
+                ]
+                .spacing(10);
+                if let Some(err) = error {
+                    col = col.push(text(err.to_string()));
+                }
+                col.into()
+            }
+            Some(Screen::Unlocked {
+                view: UnlockedView::DeleteConfirm { key, error },
+                ..
+            }) => {
+                let mut col = column![
+                    text(format!(
+                        "Delete {} — {}? This cannot be undone.",
+                        key.0, key.1
+                    )),
+                    button("Delete").on_press(Message::DeleteConfirmed),
+                    button("Cancel").on_press(Message::DeleteCancelled),
                 ]
                 .spacing(10);
                 if let Some(err) = error {
@@ -1107,6 +1175,67 @@ mod tests {
                 assert!(error.is_none());
             }
             _ => panic!("expected Edit view prefilled with existing credential"),
+        }
+    }
+
+    #[test]
+    fn delete_confirmed_removes_credential_and_returns_to_list() {
+        let mut vault = sekrets_core::Vault::create(TEST_PASSWORD).expect("create should succeed");
+        vault
+            .add("github", "alice", "hunter2")
+            .expect("add should succeed");
+
+        let mut app = SekretsApp {
+            screen: Some(Screen::Unlocked {
+                vault,
+                view: UnlockedView::DeleteConfirm {
+                    key: ("github".to_string(), "alice".to_string()),
+                    error: None,
+                },
+                last_activity: Instant::now(),
+                clipboard_copied_at: None,
+            }),
+        };
+        let _ = app.update(Message::DeleteConfirmed);
+        match &app.screen {
+            Some(Screen::Unlocked {
+                view: UnlockedView::List { .. },
+                vault,
+                ..
+            }) => {
+                assert_eq!(vault.search("github").len(), 0);
+            }
+            _ => panic!("expected List view after delete"),
+        }
+    }
+
+    #[test]
+    fn delete_confirmed_missing_credential_shows_inline_error_and_stays_on_delete_confirm() {
+        // No credential added: the key in DeleteConfirm doesn't exist in the vault,
+        // so `Vault::delete` returns `AccountWithUsernameNotFound`. This simulates a
+        // race (e.g. deleted elsewhere) without needing to fabricate one.
+        let vault = sekrets_core::Vault::create(TEST_PASSWORD).expect("create should succeed");
+
+        let mut app = SekretsApp {
+            screen: Some(Screen::Unlocked {
+                vault,
+                view: UnlockedView::DeleteConfirm {
+                    key: ("github".to_string(), "alice".to_string()),
+                    error: None,
+                },
+                last_activity: Instant::now(),
+                clipboard_copied_at: None,
+            }),
+        };
+        let _ = app.update(Message::DeleteConfirmed);
+        match &app.screen {
+            Some(Screen::Unlocked {
+                view: UnlockedView::DeleteConfirm { error, .. },
+                ..
+            }) => {
+                assert!(error.is_some());
+            }
+            _ => panic!("expected to stay on DeleteConfirm view with an error"),
         }
     }
 
