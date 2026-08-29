@@ -61,6 +61,11 @@ pub enum UnlockedView {
         key: (String, String),
         error: Option<VaultError>,
     },
+    ChangeMasterPassword {
+        new: String,
+        confirm: String,
+        error: Option<VaultError>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -90,6 +95,10 @@ pub enum Message {
     DeleteRequested(String, String),
     DeleteConfirmed,
     DeleteCancelled,
+    NavigateToChangeMasterPassword,
+    ChangeMpNewChanged(String),
+    ChangeMpConfirmChanged(String),
+    ChangeMpSubmitted,
 }
 
 /// Returns true once `delay` has elapsed since `copied_at`, as measured against `now`.
@@ -514,6 +523,65 @@ impl SekretsApp {
                 }
                 Task::none()
             }
+            Message::NavigateToChangeMasterPassword => {
+                if let Some(Screen::Unlocked { view, .. }) = &mut self.screen {
+                    *view = UnlockedView::ChangeMasterPassword {
+                        new: String::new(),
+                        confirm: String::new(),
+                        error: None,
+                    };
+                }
+                Task::none()
+            }
+            Message::ChangeMpNewChanged(v) => {
+                if let Some(Screen::Unlocked {
+                    view: UnlockedView::ChangeMasterPassword { new, .. },
+                    ..
+                }) = &mut self.screen
+                {
+                    *new = v;
+                }
+                Task::none()
+            }
+            Message::ChangeMpConfirmChanged(v) => {
+                if let Some(Screen::Unlocked {
+                    view: UnlockedView::ChangeMasterPassword { confirm, .. },
+                    ..
+                }) = &mut self.screen
+                {
+                    *confirm = v;
+                }
+                Task::none()
+            }
+            Message::ChangeMpSubmitted => {
+                if let Some(Screen::Unlocked {
+                    vault,
+                    view:
+                        UnlockedView::ChangeMasterPassword {
+                            new,
+                            confirm,
+                            error,
+                        },
+                    ..
+                }) = &mut self.screen
+                {
+                    if new != confirm {
+                        *error = Some(VaultError::Io("Passwords don't match".to_string()));
+                    } else {
+                        match vault.change_master_password(new) {
+                            Ok(()) => {
+                                if let Some(Screen::Unlocked { view, .. }) = &mut self.screen {
+                                    *view = UnlockedView::List {
+                                        query: String::new(),
+                                    };
+                                }
+                            }
+                            Err(e) => *error = Some(e),
+                        }
+                    }
+                }
+                Task::none()
+            }
         }
     }
 
@@ -580,6 +648,8 @@ impl SekretsApp {
                     text_input("Search accounts or usernames", query)
                         .on_input(Message::SearchChanged),
                     button("Add credential").on_press(Message::NavigateToAdd),
+                    button("Change master password")
+                        .on_press(Message::NavigateToChangeMasterPassword),
                 ]
                 .spacing(10);
                 for cred in results {
@@ -691,6 +761,31 @@ impl SekretsApp {
                     )),
                     button("Delete").on_press(Message::DeleteConfirmed),
                     button("Cancel").on_press(Message::DeleteCancelled),
+                ]
+                .spacing(10);
+                if let Some(err) = error {
+                    col = col.push(text(err.to_string()));
+                }
+                col.into()
+            }
+            Some(Screen::Unlocked {
+                view:
+                    UnlockedView::ChangeMasterPassword {
+                        new,
+                        confirm,
+                        error,
+                    },
+                ..
+            }) => {
+                let mut col = column![
+                    text("Change master password"),
+                    text_input("New master password", new)
+                        .on_input(Message::ChangeMpNewChanged)
+                        .secure(true),
+                    text_input("Confirm new master password", confirm)
+                        .on_input(Message::ChangeMpConfirmChanged)
+                        .secure(true),
+                    button("Change password").on_press(Message::ChangeMpSubmitted),
                 ]
                 .spacing(10);
                 if let Some(err) = error {
@@ -1285,6 +1380,61 @@ mod tests {
             }),
         };
         let _ = app.view(); // must not panic
+    }
+
+    #[test]
+    fn change_mp_submitted_mismatched_confirm_shows_error() {
+        let vault = sekrets_core::Vault::create(TEST_PASSWORD).expect("create should succeed");
+        let mut app = SekretsApp {
+            screen: Some(Screen::Unlocked {
+                vault,
+                view: UnlockedView::ChangeMasterPassword {
+                    new: "new-pass".to_string(),
+                    confirm: "different".to_string(),
+                    error: None,
+                },
+                last_activity: Instant::now(),
+                clipboard_copied_at: None,
+            }),
+        };
+        let _ = app.update(Message::ChangeMpSubmitted);
+        match &app.screen {
+            Some(Screen::Unlocked {
+                view: UnlockedView::ChangeMasterPassword { error, .. },
+                ..
+            }) => {
+                assert!(error.is_some())
+            }
+            _ => panic!("expected to stay on ChangeMasterPassword view"),
+        }
+    }
+
+    #[test]
+    fn change_mp_submitted_matching_confirm_changes_password_and_returns_to_list() {
+        let vault = sekrets_core::Vault::create(TEST_PASSWORD).expect("create should succeed");
+        let mut app = SekretsApp {
+            screen: Some(Screen::Unlocked {
+                vault,
+                view: UnlockedView::ChangeMasterPassword {
+                    new: "new-master-password".to_string(),
+                    confirm: "new-master-password".to_string(),
+                    error: None,
+                },
+                last_activity: Instant::now(),
+                clipboard_copied_at: None,
+            }),
+        };
+        let _ = app.update(Message::ChangeMpSubmitted);
+        assert!(matches!(
+            app.screen,
+            Some(Screen::Unlocked {
+                view: UnlockedView::List { .. },
+                ..
+            })
+        ));
+
+        let reunlocked = sekrets_core::Vault::unlock("new-master-password");
+        assert!(reunlocked.is_ok());
     }
 
     #[test]
