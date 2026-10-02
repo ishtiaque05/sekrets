@@ -74,19 +74,23 @@ jobs:
           echo -e "$CHANGELOG" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
 
-      - name: Build Debian Package
-        run: cargo deb --deb-version "$LIB_VERSION"
+      - name: Build Debian Package (CLI)
+        run: cargo deb -p sekrets-cli --deb-version "$LIB_VERSION"
 
-      - name: Build Release Binary
+      - name: Build Debian Package (GUI)
+        run: cargo deb -p sekrets-gui --deb-version "$LIB_VERSION"
+
+      - name: Build Release Binaries
         run: cargo build --release
 
       - name: Package Release Files
         run: |
           mkdir sekrets-release
           cp target/release/sekrets sekrets-release/
+          cp target/release/sekrets-gui sekrets-release/
           cp Makefile sekrets-release/
           cd sekrets-release
-          tar -czvf sekrets-linux.tar.gz sekrets Makefile
+          tar -czvf sekrets-linux.tar.gz sekrets sekrets-gui Makefile
           mv sekrets-linux.tar.gz ../
 
       - name: Create GitHub Release

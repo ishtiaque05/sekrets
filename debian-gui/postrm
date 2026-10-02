@@ -1,0 +1,19 @@
+#!/bin/sh
+set -e
+
+echo "Sekrets GUI: Running post-removal cleanup..."
+
+case "$1" in
+    remove|purge)
+        if [ -n "$SUDO_USER" ]; then
+            USER="$SUDO_USER"
+        else
+            USER=$(whoami | awk '{print $1}' 2>/dev/null || echo "$USER")
+        fi
+
+        echo "Note: sekrets-gui shares its data with the sekrets CLI package."
+        echo "Data directory cleanup is handled by the sekrets (CLI) package's own postrm."
+        ;;
+esac
+
+exit 0
