@@ -1,4 +1,5 @@
 mod screen;
+mod style;
 
 use screen::SekretsApp;
 
@@ -20,6 +21,10 @@ impl SekretsApp {
         "Sekrets".to_string()
     }
 
+    fn theme(&self) -> iced::Theme {
+        style::theme()
+    }
+
     fn subscription(&self) -> iced::Subscription<screen::Message> {
         // Every screen that holds — or has in flight — a decrypted vault must tick, or it
         // never auto-locks. `MigrationPrompt` is one a user can sit on indefinitely.
@@ -37,5 +42,8 @@ impl SekretsApp {
 fn main() -> iced::Result {
     iced::application(SekretsApp::title, SekretsApp::update, SekretsApp::view)
         .subscription(SekretsApp::subscription)
+        .theme(SekretsApp::theme)
+        .window_size(iced::Size::new(720.0, 800.0))
+        .centered()
         .run_with(SekretsApp::new)
 }

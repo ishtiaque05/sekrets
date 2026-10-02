@@ -1,9 +1,11 @@
 use std::path::PathBuf;
 use std::time::Instant;
 
-use iced::widget::{button, column, row, text, text_input};
-use iced::{Element, Task};
+use iced::widget::{button, column, container, row, scrollable, text, text_input, Space};
+use iced::{Alignment, Element, Font, Length, Task};
 use sekrets_core::{Vault, VaultError, VersionInfo};
+
+use crate::style;
 
 // Exactly one `Screen` exists for the lifetime of the app (it *is* the app state), so the
 // size spread between variants costs a couple of hundred bytes once — boxing fields to
@@ -193,6 +195,77 @@ fn locked_screen() -> Screen {
         error: None,
         unlocking: false,
     }
+}
+
+/// The bar running across the top of every unlocked-app screen: a title on the left,
+/// and (optionally) a row of low-emphasis actions pinned to the right.
+fn top_bar<'a>(
+    title: impl text::IntoFragment<'a>,
+    actions: Vec<Element<'a, Message>>,
+) -> Element<'a, Message> {
+    let mut bar = row![text(title).size(style::HEADING_SIZE)]
+        .align_y(Alignment::Center)
+        .spacing(style::SPACE_MD);
+    bar = bar.push(Space::with_width(Length::Fill));
+    for action in actions {
+        bar = bar.push(action);
+    }
+    container(bar)
+        .padding([style::SPACE_MD, style::SPACE_LG])
+        .width(Length::Fill)
+        .style(style::header_bar)
+        .into()
+}
+
+/// A single low-emphasis action rendered in a [`top_bar`] or as a form's escape hatch
+/// (Back / Cancel), so navigation never visually competes with a screen's primary
+/// action.
+fn ghost<'a>(label: &'a str, on_press: Message) -> Element<'a, Message> {
+    button(text(label).size(style::CAPTION_SIZE))
+        .on_press(on_press)
+        .style(style::ghost_button)
+        .into()
+}
+
+/// A full-width primary-action button with a centered label — the one emphasized
+/// control on a form (Create vault, Unlock, Save, …).
+fn primary_button<'a>(label: &'a str, on_press: Message) -> Element<'a, Message> {
+    button(text(label).width(Length::Fill).center())
+        .on_press(on_press)
+        .padding(style::SPACE_SM)
+        .width(Length::Fill)
+        .style(button::primary)
+        .into()
+}
+
+/// A full-window message, centered, used for the brief transitional screens
+/// (locating the vault file, running a migration) that have no controls of their own.
+fn centered_message<'a>(message: &'a str) -> Element<'a, Message> {
+    container(
+        text(message)
+            .size(style::BODY_SIZE)
+            .style(style::muted_text),
+    )
+    .width(Length::Fill)
+    .height(Length::Fill)
+    .center_x(Length::Fill)
+    .center_y(Length::Fill)
+    .into()
+}
+
+/// Wraps a screen's content in the app's card surface, centered in the window — the
+/// shared frame for auth screens, confirmation prompts, and one-off forms.
+fn card_screen<'a>(content: impl Into<Element<'a, Message>>) -> Element<'a, Message> {
+    let card = container(content.into())
+        .width(Length::Fixed(style::FORM_WIDTH))
+        .padding(style::SPACE_XL)
+        .style(style::card);
+    container(card)
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .center_x(Length::Fill)
+        .center_y(Length::Fill)
+        .into()
 }
 
 impl std::fmt::Debug for Screen {
@@ -786,7 +859,7 @@ impl SekretsApp {
 
     pub fn view(&self) -> Element<'_, Message> {
         match &self.screen {
-            Some(Screen::Locating) => text("Looking for your sekrets file...").into(),
+            Some(Screen::Locating) => centered_message("Looking for your sekrets file…"),
             Some(Screen::NoVaultFound {
                 path,
                 password,
@@ -795,26 +868,29 @@ impl SekretsApp {
                 creating,
             }) => {
                 let mut col = column![
-                    text(format!("No sekrets file found at {}", path.display())),
-                    text("Choose a master password to create one:"),
+                    text("Create your vault").size(style::TITLE_SIZE),
+                    text(format!("No sekrets file found at {}.", path.display()))
+                        .size(style::CAPTION_SIZE)
+                        .style(style::muted_text),
+                    text("Choose a master password to protect it.").size(style::BODY_SIZE),
                     text_input("Master password", password)
                         .on_input(Message::CreatePasswordChanged)
+                        .padding(style::SPACE_SM)
                         .secure(true),
                     text_input("Confirm master password", confirm)
                         .on_input(Message::CreateConfirmChanged)
+                        .padding(style::SPACE_SM)
                         .secure(true),
-                    button(if *creating {
-                        "Creating..."
-                    } else {
-                        "Create vault"
-                    })
-                    .on_press(Message::CreateSubmitted),
                 ]
-                .spacing(10);
+                .spacing(style::SPACE_MD);
                 if let Some(err) = error {
-                    col = col.push(text(err));
+                    col = col.push(text(err).size(style::CAPTION_SIZE).style(style::danger_text));
                 }
-                col.into()
+                col = col.push(primary_button(
+                    if *creating { "Creating…" } else { "Create vault" },
+                    Message::CreateSubmitted,
+                ));
+                card_screen(col)
             }
             Some(Screen::Locked {
                 password,
@@ -823,19 +899,25 @@ impl SekretsApp {
                 ..
             }) => {
                 let mut col = column![
-                    text("Enter your master password"),
+                    text("Unlock your vault").size(style::TITLE_SIZE),
+                    text("Enter your master password to continue.")
+                        .size(style::BODY_SIZE)
+                        .style(style::muted_text),
                     text_input("Master password", password)
                         .on_input(Message::PasswordChanged)
                         .on_submit(Message::UnlockSubmitted)
+                        .padding(style::SPACE_SM)
                         .secure(true),
-                    button(if *unlocking { "Unlocking..." } else { "Unlock" })
-                        .on_press(Message::UnlockSubmitted),
                 ]
-                .spacing(10);
+                .spacing(style::SPACE_MD);
                 if let Some(err) = error {
-                    col = col.push(text(err.to_string()));
+                    col = col.push(text(err.to_string()).size(style::CAPTION_SIZE).style(style::danger_text));
                 }
-                col.into()
+                col = col.push(primary_button(
+                    if *unlocking { "Unlocking…" } else { "Unlock" },
+                    Message::UnlockSubmitted,
+                ));
+                card_screen(col)
             }
             Some(Screen::Unlocked {
                 vault,
@@ -843,23 +925,73 @@ impl SekretsApp {
                 ..
             }) => {
                 let results = vault.search(query);
-                let mut list = column![
-                    text_input("Search accounts or usernames", query)
-                        .on_input(Message::SearchChanged),
-                    button("Add credential").on_press(Message::NavigateToAdd),
-                    button("Change master password")
-                        .on_press(Message::NavigateToChangeMasterPassword),
-                    button("Versions").on_press(Message::NavigateToVersions),
-                ]
-                .spacing(10);
-                for cred in results {
-                    list = list.push(
-                        button(text(format!("{} — {}", cred.account, cred.username))).on_press(
-                            Message::CredentialSelected(cred.account.clone(), cred.username.clone()),
-                        ),
+                let header = top_bar(
+                    "Sekrets",
+                    vec![
+                        ghost("Change master password", Message::NavigateToChangeMasterPassword),
+                        ghost("Versions", Message::NavigateToVersions),
+                    ],
+                );
+
+                let mut rows = column![].spacing(style::SPACE_XS);
+                if results.is_empty() {
+                    let message = if query.is_empty() {
+                        "No credentials yet. Add your first one to get started."
+                    } else {
+                        "No matches for your search."
+                    };
+                    rows = rows.push(
+                        text(message)
+                            .size(style::BODY_SIZE)
+                            .style(style::muted_text),
                     );
+                } else {
+                    for cred in results {
+                        rows = rows.push(
+                            button(
+                                row![
+                                    column![
+                                        text(cred.account.clone()).size(style::BODY_SIZE),
+                                        text(cred.username.clone())
+                                            .size(style::CAPTION_SIZE)
+                                            .style(style::muted_text),
+                                    ]
+                                    .spacing(2),
+                                    Space::with_width(Length::Fill),
+                                    text("›").size(style::HEADING_SIZE).style(style::muted_text),
+                                ]
+                                .align_y(Alignment::Center),
+                            )
+                            .on_press(Message::CredentialSelected(
+                                cred.account.clone(),
+                                cred.username.clone(),
+                            ))
+                            .width(Length::Fill)
+                            .padding([style::SPACE_SM, style::SPACE_MD])
+                            .style(style::list_row),
+                        );
+                    }
                 }
-                list.into()
+
+                let content = column![
+                    row![
+                        text_input("Search accounts or usernames", query)
+                            .on_input(Message::SearchChanged)
+                            .padding(style::SPACE_SM)
+                            .width(Length::Fill),
+                        button(text("Add credential"))
+                            .on_press(Message::NavigateToAdd)
+                            .padding([style::SPACE_SM, style::SPACE_MD])
+                            .style(button::primary),
+                    ]
+                    .spacing(style::SPACE_SM)
+                    .align_y(Alignment::Center),
+                    scrollable(rows).height(Length::Fill),
+                ]
+                .spacing(style::SPACE_LG)
+                .padding(style::SPACE_LG);
+
+                column![header, content].into()
             }
             Some(Screen::Unlocked {
                 vault,
@@ -873,41 +1005,94 @@ impl SekretsApp {
                         let password_display = if *revealed {
                             cred.password.clone()
                         } else {
-                            "••••••••".to_string()
+                            "••••••••••••".to_string()
                         };
+
+                        let chip = container(
+                            row![
+                                text(password_display)
+                                    .font(Font::MONOSPACE)
+                                    .size(style::PASSWORD_SIZE)
+                                    .width(Length::Fill),
+                                ghost(
+                                    if *revealed { "Hide" } else { "Show" },
+                                    Message::RevealToggled
+                                ),
+                                button(text("Copy"))
+                                    .on_press(Message::CopyPassword(cred.password.clone()))
+                                    .padding([style::SPACE_XS, style::SPACE_SM])
+                                    .style(button::secondary),
+                            ]
+                            .spacing(style::SPACE_SM)
+                            .align_y(Alignment::Center),
+                        )
+                        .padding(style::SPACE_MD)
+                        .width(Length::Fill)
+                        .style(style::password_chip);
+
                         let mut col = column![
-                            text(format!("{} — {}", cred.account, cred.username)),
-                            text(password_display),
-                            button(if *revealed { "Hide" } else { "Reveal" })
-                                .on_press(Message::RevealToggled),
-                            button("Copy password")
-                                .on_press(Message::CopyPassword(cred.password.clone())),
-                            button("Edit").on_press(Message::NavigateToEdit(
-                                cred.account.clone(),
-                                cred.username.clone()
-                            )),
-                            button("Delete").on_press(Message::DeleteRequested(
-                                cred.account.clone(),
-                                cred.username.clone()
-                            )),
-                            button("Back").on_press(Message::NavigateToList),
-                            text("Password history:"),
-                        ]
-                        .spacing(10);
+                            top_bar(cred.account.clone(), vec![ghost("Back", Message::NavigateToList)]),
+                            column![
+                                text(cred.account.clone()).size(style::TITLE_SIZE),
+                                text(cred.username.clone())
+                                    .size(style::BODY_SIZE)
+                                    .style(style::muted_text),
+                                chip,
+                                row![
+                                    button(text("Edit"))
+                                        .on_press(Message::NavigateToEdit(
+                                            cred.account.clone(),
+                                            cred.username.clone()
+                                        ))
+                                        .padding([style::SPACE_XS, style::SPACE_MD])
+                                        .style(button::secondary),
+                                    button(text("Delete"))
+                                        .on_press(Message::DeleteRequested(
+                                            cred.account.clone(),
+                                            cred.username.clone()
+                                        ))
+                                        .padding([style::SPACE_XS, style::SPACE_MD])
+                                        .style(button::danger),
+                                ]
+                                .spacing(style::SPACE_SM),
+                                text("Password history").size(style::HEADING_SIZE),
+                            ]
+                            .spacing(style::SPACE_MD)
+                            .padding(style::SPACE_LG),
+                        ];
+
                         if cred.history.is_empty() {
-                            col = col.push(text("No previous passwords recorded."));
+                            col = col.push(
+                                container(
+                                    text("No previous passwords recorded.")
+                                        .size(style::CAPTION_SIZE)
+                                        .style(style::muted_text),
+                                )
+                                .padding([0.0, style::SPACE_LG]),
+                            );
                         } else {
+                            let mut history = column![].spacing(style::SPACE_XS);
                             for (i, entry) in cred.history.iter().enumerate() {
-                                col = col.push(text(format!(
-                                    "v{}: ******** ({})",
-                                    i + 1,
-                                    entry.format_ts_local()
-                                )));
+                                history = history.push(
+                                    row![
+                                        text(format!("v{}", i + 1))
+                                            .font(Font::MONOSPACE)
+                                            .size(style::CAPTION_SIZE)
+                                            .style(style::muted_text),
+                                        text("••••••••").font(Font::MONOSPACE).size(style::CAPTION_SIZE),
+                                        Space::with_width(Length::Fill),
+                                        text(entry.format_ts_local())
+                                            .size(style::CAPTION_SIZE)
+                                            .style(style::muted_text),
+                                    ]
+                                    .spacing(style::SPACE_SM),
+                                );
                             }
+                            col = col.push(container(history).padding([0.0, style::SPACE_LG]));
                         }
                         col.into()
                     }
-                    None => text("Credential not found").into(),
+                    None => centered_message("Credential not found."),
                 }
             }
             Some(Screen::Unlocked {
@@ -922,53 +1107,88 @@ impl SekretsApp {
                 ..
             }) => {
                 let strength = if password.is_empty() {
-                    ""
-                } else if sekrets_core::secrets::password_generator::is_password_strong(password)
-                {
-                    "Strong"
+                    None
+                } else if sekrets_core::secrets::password_generator::is_password_strong(password) {
+                    Some((true, "Strong password"))
                 } else {
-                    "Weak — consider a longer or more complex password"
+                    Some((false, "Weak — consider a longer or more complex password"))
                 };
 
                 let mut col = column![
-                    text(if key.is_some() {
-                        "Edit credential"
-                    } else {
-                        "Add credential"
-                    }),
-                    text_input("Account", account).on_input(Message::EditAccountChanged),
-                    text_input("Username", username).on_input(Message::EditUsernameChanged),
-                    text_input("Password", password)
-                        .on_input(Message::EditPasswordChanged)
-                        .secure(true),
-                    button("Generate password").on_press(Message::GeneratePassword),
-                    text(strength),
-                    button("Save").on_press(Message::EditSubmitted),
-                    button("Cancel").on_press(Message::NavigateToList),
+                    text(if key.is_some() { "Edit credential" } else { "Add credential" })
+                        .size(style::TITLE_SIZE),
+                    text_input("Account", account)
+                        .on_input(Message::EditAccountChanged)
+                        .padding(style::SPACE_SM),
+                    text_input("Username", username)
+                        .on_input(Message::EditUsernameChanged)
+                        .padding(style::SPACE_SM),
+                    row![
+                        text_input("Password", password)
+                            .on_input(Message::EditPasswordChanged)
+                            .padding(style::SPACE_SM)
+                            .font(Font::MONOSPACE)
+                            .width(Length::Fill)
+                            .secure(true),
+                        button(text("Generate"))
+                            .on_press(Message::GeneratePassword)
+                            .padding(style::SPACE_SM)
+                            .style(button::secondary),
+                    ]
+                    .spacing(style::SPACE_SM),
                 ]
-                .spacing(10);
-                if let Some(err) = error {
-                    col = col.push(text(err.to_string()));
+                .spacing(style::SPACE_MD);
+                if let Some((is_strong, message)) = strength {
+                    let style_fn = if is_strong { style::success_text } else { style::danger_text };
+                    col = col.push(text(message).size(style::CAPTION_SIZE).style(style_fn));
                 }
-                col.into()
+                if let Some(err) = error {
+                    col = col.push(text(err.to_string()).size(style::CAPTION_SIZE).style(style::danger_text));
+                }
+                col = col.push(
+                    row![
+                        button(text("Save").width(Length::Fill).center())
+                            .on_press(Message::EditSubmitted)
+                            .padding(style::SPACE_SM)
+                            .width(Length::Fill)
+                            .style(button::primary),
+                        ghost("Cancel", Message::NavigateToList),
+                    ]
+                    .spacing(style::SPACE_MD)
+                    .align_y(Alignment::Center),
+                );
+                card_screen(col)
             }
             Some(Screen::Unlocked {
                 view: UnlockedView::DeleteConfirm { key, error },
                 ..
             }) => {
                 let mut col = column![
+                    text("Delete credential?").size(style::TITLE_SIZE),
                     text(format!(
-                        "Delete {} — {}? This cannot be undone.",
+                        "This removes {} — {} permanently. This can't be undone.",
                         key.0, key.1
-                    )),
-                    button("Delete").on_press(Message::DeleteConfirmed),
-                    button("Cancel").on_press(Message::DeleteCancelled),
+                    ))
+                    .size(style::BODY_SIZE)
+                    .style(style::muted_text),
                 ]
-                .spacing(10);
+                .spacing(style::SPACE_MD);
                 if let Some(err) = error {
-                    col = col.push(text(err.to_string()));
+                    col = col.push(text(err.to_string()).size(style::CAPTION_SIZE).style(style::danger_text));
                 }
-                col.into()
+                col = col.push(
+                    row![
+                        button(text("Delete").width(Length::Fill).center())
+                            .on_press(Message::DeleteConfirmed)
+                            .padding(style::SPACE_SM)
+                            .width(Length::Fill)
+                            .style(button::danger),
+                        ghost("Cancel", Message::DeleteCancelled),
+                    ]
+                    .spacing(style::SPACE_MD)
+                    .align_y(Alignment::Center),
+                );
+                card_screen(col)
             }
             Some(Screen::Unlocked {
                 view:
@@ -980,21 +1200,33 @@ impl SekretsApp {
                 ..
             }) => {
                 let mut col = column![
-                    text("Change master password"),
+                    text("Change master password").size(style::TITLE_SIZE),
                     text_input("New master password", new)
                         .on_input(Message::ChangeMpNewChanged)
+                        .padding(style::SPACE_SM)
                         .secure(true),
                     text_input("Confirm new master password", confirm)
                         .on_input(Message::ChangeMpConfirmChanged)
+                        .padding(style::SPACE_SM)
                         .secure(true),
-                    button("Change password").on_press(Message::ChangeMpSubmitted),
-                    button("Cancel").on_press(Message::NavigateToList),
                 ]
-                .spacing(10);
+                .spacing(style::SPACE_MD);
                 if let Some(err) = error {
-                    col = col.push(text(err.to_string()));
+                    col = col.push(text(err.to_string()).size(style::CAPTION_SIZE).style(style::danger_text));
                 }
-                col.into()
+                col = col.push(
+                    row![
+                        button(text("Change password").width(Length::Fill).center())
+                            .on_press(Message::ChangeMpSubmitted)
+                            .padding(style::SPACE_SM)
+                            .width(Length::Fill)
+                            .style(button::primary),
+                        ghost("Cancel", Message::NavigateToList),
+                    ]
+                    .spacing(style::SPACE_MD)
+                    .align_y(Alignment::Center),
+                );
+                card_screen(col)
             }
             Some(Screen::Unlocked {
                 view:
@@ -1006,44 +1238,81 @@ impl SekretsApp {
                     },
                 ..
             }) => {
-                let mut col = column![text("Versions")].spacing(10);
-                for v in versions {
-                    col = col.push(
-                        row![
-                            // The modified time, not the number, is what identifies a
-                            // restore point: numbers shift on every snapshot rotation.
-                            text(format!("v{}  {}", v.number, v.format_modified_local())),
-                            button("Switch to this version")
-                                .on_press(Message::SwitchVersionRequested(v.number)),
-                        ]
-                        .spacing(10),
+                let header = top_bar("Version history", vec![ghost("Back", Message::NavigateToList)]);
+
+                let mut rows = column![].spacing(style::SPACE_XS);
+                if versions.is_empty() {
+                    rows = rows.push(
+                        text("No earlier versions saved yet.")
+                            .size(style::BODY_SIZE)
+                            .style(style::muted_text),
                     );
                 }
-                col = col.push(
+                for v in versions {
+                    rows = rows.push(
+                        container(
+                            row![
+                                column![
+                                    text(format!("Version {}", v.number)).size(style::BODY_SIZE),
+                                    // The modified time, not the number, is what identifies a
+                                    // restore point: numbers shift on every snapshot rotation.
+                                    text(v.format_modified_local())
+                                        .size(style::CAPTION_SIZE)
+                                        .style(style::muted_text),
+                                ]
+                                .spacing(2),
+                                Space::with_width(Length::Fill),
+                                button(text("Switch to this version"))
+                                    .on_press(Message::SwitchVersionRequested(v.number))
+                                    .padding([style::SPACE_XS, style::SPACE_SM])
+                                    .style(button::secondary),
+                            ]
+                            .align_y(Alignment::Center),
+                        )
+                        .padding(style::SPACE_SM)
+                        .width(Length::Fill)
+                        .style(style::card),
+                    );
+                }
+
+                let mut content = column![
+                    scrollable(rows.spacing(style::SPACE_SM)).height(Length::Fill),
                     text_input("Password for the selected version", version_password)
                         .on_input(Message::SwitchVersionPasswordChanged)
+                        .padding(style::SPACE_SM)
                         .secure(true),
-                );
-                col = col.push(button("Back").on_press(Message::NavigateToList));
+                ]
+                .spacing(style::SPACE_MD)
+                .padding(style::SPACE_LG);
                 if let Some(err) = error {
-                    col = col.push(text(err.to_string()));
+                    content = content.push(text(err.to_string()).size(style::CAPTION_SIZE).style(style::danger_text));
                 }
-                col.into()
+
+                column![header, content].into()
             }
-            Some(Screen::Migrating { .. }) => {
-                text("Upgrading your sekrets file...").into()
-            }
-            Some(Screen::MigrationPrompt { .. }) => column![
-                text("Your sekrets file uses an older format."),
-                text(
-                    "It will be upgraded to the new format. A backup of your current file will be saved first."
-                ),
-                button("Upgrade now").on_press(Message::MigrateAccepted),
-                button("Not now").on_press(Message::MigrateDeclined),
-            ]
-            .spacing(10)
-            .into(),
-            None => text("").into(),
+            Some(Screen::Migrating { .. }) => centered_message("Upgrading your sekrets file…"),
+            Some(Screen::MigrationPrompt { .. }) => card_screen(
+                column![
+                    text("Your sekrets file uses an older format.").size(style::TITLE_SIZE),
+                    text(
+                        "It will be upgraded to the new format. A backup of your current file will be saved first."
+                    )
+                    .size(style::BODY_SIZE)
+                    .style(style::muted_text),
+                    row![
+                        button(text("Upgrade now").width(Length::Fill).center())
+                            .on_press(Message::MigrateAccepted)
+                            .padding(style::SPACE_SM)
+                            .width(Length::Fill)
+                            .style(button::primary),
+                        ghost("Not now", Message::MigrateDeclined),
+                    ]
+                    .spacing(style::SPACE_MD)
+                    .align_y(Alignment::Center),
+                ]
+                .spacing(style::SPACE_MD),
+            ),
+            None => centered_message(""),
         }
     }
 }
