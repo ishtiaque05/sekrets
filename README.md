@@ -112,7 +112,7 @@ You can install Sekrets on Ubuntu using the pre-built `.deb` package.
 Download the latest package from [sekrets releases](https://github.com/ishtiaque05/sekrets/releases)
 
 ```sh
-sudo dpkg -i sekrets_<RELEAESE_VERSION>_amd64.deb
+sudo dpkg -i sekrets_<RELEASE_VERSION>_amd64.deb
 
 sekrets --version # to verify installation
 ```

@@ -16,6 +16,9 @@ name = "sekrets"
 path = "src/main.rs"
 
 [package.metadata.deb]
+# Keep the pre-workspace package name so a 0.2.x `sekrets` install upgrades in place
+# instead of conflicting with a new `sekrets-cli` package over /usr/local/bin/sekrets.
+name = "sekrets"
 maintainer = "Syed Ishtiaque Ahmad <ishtiaque05@gmail.com>"
 depends = "libc6 (>= 2.28)"
 priority = "optional"

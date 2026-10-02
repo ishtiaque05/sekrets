@@ -120,7 +120,12 @@ jobs:
             
             ### 📥 Manual Install:
             ```sh
+            # CLI
             wget https://github.com/ishtiaque05/sekrets/releases/download/${{ github.ref_name }}/sekrets_${{ env.LIB_VERSION }}_amd64.deb
             sudo dpkg -i sekrets_${{ env.LIB_VERSION }}_amd64.deb
+
+            # Desktop GUI
+            wget https://github.com/ishtiaque05/sekrets/releases/download/${{ github.ref_name }}/sekrets-gui_${{ env.LIB_VERSION }}_amd64.deb
+            sudo dpkg -i sekrets-gui_${{ env.LIB_VERSION }}_amd64.deb
             ```
 
