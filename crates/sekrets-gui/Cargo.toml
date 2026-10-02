@@ -1,6 +1,6 @@
 [package]
 name = "sekrets-gui"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 license = "MIT"
 authors = ["Syed Ishtiaque Ahmad <ishtiaque05@gmail.com>"]
@@ -44,7 +44,7 @@ maintainer-scripts = "../../debian-gui/"
 name = "Sekrets"
 identifier = "com.ishtiaque05.sekrets-gui"
 icon = []
-version = "0.3.0"
+version = "0.3.1"
 copyright = "Copyright (c) Syed Ishtiaque Ahmad"
 category = "public.app-category.utilities"
 short_description = "Desktop GUI for the sekrets secret manager"
