@@ -3915,7 +3915,7 @@ dependencies = [
 
 [[package]]
 name = "sekrets-cli"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -3936,7 +3936,7 @@ dependencies = [
 
 [[package]]
 name = "sekrets-core"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "aes-gcm",
  "argon2",
@@ -3953,7 +3953,7 @@ dependencies = [
 
 [[package]]
 name = "sekrets-gui"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "futures",
  "iced",
